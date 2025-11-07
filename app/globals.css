@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 210 20% 15%;
+  --muted: 210 16% 93%;
+  --muted-foreground: 210 15% 35%;
+  --popover: 0 0% 100%;
+  --card: 0 0% 100%;
+  --border: 210 16% 82%;
+  --input: 210 16% 82%;
+  --ring: 184 73% 25%;
+  --radius: 0.75rem;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 font-sans;
+}
+
+main {
+  @apply min-h-screen bg-slate-50;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 95, 115, 0.4);
+  border-radius: 9999px;
+}
