@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "ingest-knowledge": "ts-node --transpile-only scripts/ingest-knowledge.ts",
+    "setup:env": "node scripts/setup-env.js",
     "test": "jest"
   },
   "dependencies": {

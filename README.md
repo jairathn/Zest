@@ -4,39 +4,41 @@ A Next.js 14 prototype for dermatology biologic optimization with formulary guid
 
 ## Setup
 
-1. Install dependencies:
+1. Make sure you are in the repository root (the folder that contains this README). If you are unsure, run `pwd` and verify the path ends with `/Zest`.
+
+2. Install dependencies:
 
 ```bash
 npm install
 ```
 
-2. Configure environment variables:
+3. Configure environment variables (creates `.env` if it is missing):
 
 ```bash
-cp .env.example .env
-# Update values for your environment
+npm run setup:env
+# Then edit the new .env file with your credentials
 ```
 
-3. Set up the database schema and seed mock data:
+4. Set up the database schema and seed mock data:
 
 ```bash
 npx prisma db push
 npx prisma db seed
 ```
 
-4. Ingest knowledge base embeddings (requires OpenAI + Pinecone credentials):
+5. Ingest knowledge base embeddings (requires OpenAI + Pinecone credentials):
 
 ```bash
 npm run ingest-knowledge
 ```
 
-5. Run the development server:
+6. Run the development server:
 
 ```bash
 npm run dev
 ```
 
-6. Open the app at [http://localhost:3000](http://localhost:3000).
+7. Open the app at [http://localhost:3000](http://localhost:3000).
 
 ## Test Accounts
 
@@ -64,6 +66,7 @@ Five mock patients spanning stability and formulary quadrants are seeded. Review
 - `npm run dev` – start the development server
 - `npm run build` – production build
 - `npm run start` – run the compiled app
+- `npm run setup:env` – scaffold a `.env` file from the template
 - `npm run ingest-knowledge` – embed knowledge base markdown into Pinecone
 
 ## Deployment
