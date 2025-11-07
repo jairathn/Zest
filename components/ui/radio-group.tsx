@@ -6,8 +6,10 @@ import { cn } from '@/lib/utils';
 
 const RadioGroup = RadioGroupPrimitive.Root;
 
-const RadioGroupItem = React.forwardRef<React.ElementRef<typeof RadioGroupPrimitive.Item>, React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>>(\
-  ({ className, children, ...props }, ref) => (
+const RadioGroupItem = React.forwardRef<
+  React.ElementRef<typeof RadioGroupPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>
+>(({ className, children, ...props }, ref) => (
     <RadioGroupPrimitive.Item
       ref={ref}
       className={cn(
