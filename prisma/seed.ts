@@ -5,48 +5,35 @@ const prisma = new PrismaClient();
 const decimal = (value: number) => new Prisma.Decimal(value);
 
 async function main() {
-  await prisma.recommendationFeedback.deleteMany();
+  console.log('Seeding database...');
+
+  // Clean existing data
   await prisma.recommendation.deleteMany();
-  await prisma.clinicalAssessment.deleteMany();
+  await prisma.assessment.deleteMany();
+  await prisma.contraindication.deleteMany();
   await prisma.pharmacyClaim.deleteMany();
-  await prisma.claimsHistory.deleteMany();
-  await prisma.currentMedication.deleteMany();
+  await prisma.currentBiologic.deleteMany();
   await prisma.patient.deleteMany();
   await prisma.formularyDrug.deleteMany();
   await prisma.insurancePlan.deleteMany();
-  await prisma.user.deleteMany();
+  await prisma.knowledgeDocument.deleteMany();
 
-  const provider = await prisma.user.create({
-    data: {
-      email: 'provider@zest.com',
-      password: '$2a$10$placeholderhash',
-      name: 'Dr. Provider',
-      npi: '1234567890',
-      role: 'PROVIDER'
-    }
-  });
-
-  await prisma.user.create({
-    data: {
-      email: 'admin@zest.com',
-      password: '$2a$10$placeholderhash',
-      name: 'Admin User',
-      npi: null,
-      role: 'ADMIN'
-    }
-  });
-
+  // Create insurance plan
   const plan = await prisma.insurancePlan.create({
     data: {
       planName: 'BlueCross PPO 2025',
-      payerName: 'BlueCross',
+      payerName: 'BlueCross BlueShield',
       effectiveDate: new Date('2025-01-01'),
-      formularyVersion: '2025-Q1'
-    }
+      formularyVersion: '2025-Q1',
+    },
   });
 
-  await prisma.formularyDrug.createMany({
+  console.log('Created insurance plan:', plan.id);
+
+  // Create formulary drugs
+  const formularyDrugs = await prisma.formularyDrug.createMany({
     data: [
+      // Tier 1 - Preferred biosimilars
       {
         planId: plan.id,
         drugName: 'Amjevita',
@@ -56,10 +43,9 @@ async function main() {
         requiresPA: false,
         stepTherapyRequired: false,
         annualCostWAC: decimal(28500),
-        memberCopayT1: decimal(25),
-        memberCopayT2: decimal(25),
-        memberCopayT3: decimal(25),
-        biosimilarOf: 'Humira'
+        memberCopayT1: decimal(300),
+        biosimilarOf: 'Humira',
+        approvedIndications: ['PSORIASIS', 'ATOPIC_DERMATITIS'],
       },
       {
         planId: plan.id,
@@ -70,11 +56,11 @@ async function main() {
         requiresPA: false,
         stepTherapyRequired: false,
         annualCostWAC: decimal(29000),
-        memberCopayT1: decimal(25),
-        memberCopayT2: decimal(25),
-        memberCopayT3: decimal(25),
-        biosimilarOf: 'Humira'
+        memberCopayT1: decimal(300),
+        biosimilarOf: 'Humira',
+        approvedIndications: ['PSORIASIS'],
       },
+      // Tier 2 - Preferred brands
       {
         planId: plan.id,
         drugName: 'Cosentyx',
@@ -84,9 +70,8 @@ async function main() {
         requiresPA: false,
         stepTherapyRequired: true,
         annualCostWAC: decimal(68000),
-        memberCopayT1: decimal(100),
-        memberCopayT2: decimal(100),
-        memberCopayT3: decimal(100)
+        memberCopayT2: decimal(1200),
+        approvedIndications: ['PSORIASIS'],
       },
       {
         planId: plan.id,
@@ -97,9 +82,8 @@ async function main() {
         requiresPA: false,
         stepTherapyRequired: true,
         annualCostWAC: decimal(75000),
-        memberCopayT1: decimal(100),
-        memberCopayT2: decimal(100),
-        memberCopayT3: decimal(100)
+        memberCopayT2: decimal(1200),
+        approvedIndications: ['PSORIASIS'],
       },
       {
         planId: plan.id,
@@ -110,10 +94,10 @@ async function main() {
         requiresPA: false,
         stepTherapyRequired: true,
         annualCostWAC: decimal(48000),
-        memberCopayT1: decimal(100),
-        memberCopayT2: decimal(100),
-        memberCopayT3: decimal(100)
+        memberCopayT2: decimal(1200),
+        approvedIndications: ['ATOPIC_DERMATITIS'],
       },
+      // Tier 3 - Non-preferred
       {
         planId: plan.id,
         drugName: 'Humira',
@@ -123,9 +107,8 @@ async function main() {
         requiresPA: true,
         stepTherapyRequired: false,
         annualCostWAC: decimal(84000),
-        memberCopayT1: decimal(850),
-        memberCopayT2: decimal(850),
-        memberCopayT3: decimal(850)
+        memberCopayT3: decimal(10200),
+        approvedIndications: ['PSORIASIS', 'ATOPIC_DERMATITIS'],
       },
       {
         planId: plan.id,
@@ -136,9 +119,8 @@ async function main() {
         requiresPA: true,
         stepTherapyRequired: false,
         annualCostWAC: decimal(72000),
-        memberCopayT1: decimal(850),
-        memberCopayT2: decimal(850),
-        memberCopayT3: decimal(850)
+        memberCopayT3: decimal(10200),
+        approvedIndications: ['PSORIASIS'],
       },
       {
         planId: plan.id,
@@ -149,210 +131,150 @@ async function main() {
         requiresPA: true,
         stepTherapyRequired: false,
         annualCostWAC: decimal(78000),
-        memberCopayT1: decimal(850),
-        memberCopayT2: decimal(850),
-        memberCopayT3: decimal(850)
+        memberCopayT3: decimal(10200),
+        approvedIndications: ['PSORIASIS'],
       },
-      {
-        planId: plan.id,
-        drugName: 'Stelara',
-        genericName: 'ustekinumab',
-        drugClass: 'IL12_23_INHIBITOR',
-        tier: 3,
-        requiresPA: true,
-        stepTherapyRequired: false,
-        annualCostWAC: decimal(89000),
-        memberCopayT1: decimal(850),
-        memberCopayT2: decimal(850),
-        memberCopayT3: decimal(850)
-      }
-    ]
+    ],
   });
 
-  const patients = [
-    {
-      info: {
-        firstName: 'John',
-        lastName: 'Doe',
-        externalId: 'P1',
-        dateOfBirth: new Date('1978-03-15')
-      },
-      currentMedication: {
-        drugName: 'Humira',
-        dose: '40mg',
-        frequency: 'Q2W',
-        route: 'SC',
-        startDate: new Date('2023-01-15'),
-        lastFillDate: new Date('2025-01-15'),
-        adherencePDC: decimal(94)
-      },
-      claimsHistory: [
-        {
-          drugName: 'Methotrexate',
-          startDate: new Date('2021-06-01'),
-          endDate: new Date('2022-08-01'),
-          reasonDiscontinued: 'Inadequate response'
-        },
-        {
-          drugName: 'Otezla',
-          startDate: new Date('2022-09-01'),
-          endDate: new Date('2022-12-01'),
-          reasonDiscontinued: 'GI side effects'
-        },
-        {
-          drugName: 'Humira',
-          startDate: new Date('2023-01-15'),
-          endDate: null,
-          reasonDiscontinued: null
-        }
-      ],
-      fills: generateQuarterlyFills('Humira', 850)
+  console.log('Created formulary drugs');
+
+  // Create sample patients
+  const patient1 = await prisma.patient.create({
+    data: {
+      externalId: 'P001',
+      firstName: 'John',
+      lastName: 'Doe',
+      dateOfBirth: new Date('1978-03-15'),
+      planId: plan.id,
     },
-    {
-      info: {
-        firstName: 'Jane',
-        lastName: 'Smith',
-        externalId: 'P2',
-        dateOfBirth: new Date('1985-07-22')
-      },
-      currentMedication: {
-        drugName: 'Cosentyx',
-        dose: '300mg',
-        frequency: 'Q4W',
-        route: 'SC',
-        startDate: new Date('2023-06-01'),
-        lastFillDate: new Date('2025-01-01'),
-        adherencePDC: decimal(97)
-      },
-      claimsHistory: [
-        { drugName: 'Topical steroids', startDate: new Date('2021-01-01'), endDate: new Date('2021-12-31'), reasonDiscontinued: 'Inadequate control' },
-        { drugName: 'Phototherapy', startDate: new Date('2022-01-01'), endDate: new Date('2022-12-31'), reasonDiscontinued: 'Limited response' }
-      ],
-      fills: generateQuarterlyFills('Cosentyx', 100)
+  });
+
+  // John - on expensive Humira, stable disease (candidate for biosimilar switch)
+  await prisma.currentBiologic.create({
+    data: {
+      patientId: patient1.id,
+      drugName: 'Humira',
+      dose: '40mg',
+      frequency: 'Q2W',
+      route: 'SC',
+      startDate: new Date('2023-01-15'),
+      lastFillDate: new Date('2025-01-15'),
     },
-    {
-      info: {
-        firstName: 'Bob',
-        lastName: 'Johnson',
-        externalId: 'P3',
-        dateOfBirth: new Date('1972-11-03')
-      },
-      currentMedication: {
-        drugName: 'Tremfya',
-        dose: '100mg',
-        frequency: 'Q8W',
-        route: 'SC',
-        startDate: new Date('2023-12-01'),
-        lastFillDate: new Date('2025-01-01'),
-        adherencePDC: decimal(89)
-      },
-      claimsHistory: [
-        { drugName: 'Humira', startDate: new Date('2021-01-01'), endDate: new Date('2022-04-01'), reasonDiscontinued: 'Loss of response' },
-        { drugName: 'Enbrel', startDate: new Date('2022-05-01'), endDate: new Date('2023-01-01'), reasonDiscontinued: 'Inadequate response' }
-      ],
-      fills: generateQuarterlyFills('Tremfya', 850)
-    },
-    {
-      info: {
-        firstName: 'Sarah',
-        lastName: 'Williams',
-        externalId: 'P4',
-        dateOfBirth: new Date('1990-02-10')
-      },
-      currentMedication: {
-        drugName: 'Amjevita',
-        dose: '40mg',
-        frequency: 'Q2W',
-        route: 'SC',
-        startDate: new Date('2024-06-01'),
-        lastFillDate: new Date('2025-01-01'),
-        adherencePDC: decimal(76)
-      },
-      claimsHistory: [
-        { drugName: 'Amjevita', startDate: new Date('2024-06-01'), endDate: null, reasonDiscontinued: null }
-      ],
-      fills: generateQuarterlyFills('Amjevita', 25)
-    },
-    {
-      info: {
-        firstName: 'Mike',
-        lastName: 'Chen',
-        externalId: 'P5',
-        dateOfBirth: new Date('1980-09-18')
-      },
-      currentMedication: {
-        drugName: 'Dupixent',
-        dose: '300mg',
-        frequency: 'Q2W',
-        route: 'SC',
-        startDate: new Date('2023-02-01'),
-        lastFillDate: new Date('2025-01-01'),
-        adherencePDC: decimal(99)
-      },
-      claimsHistory: [
-        { drugName: 'Topical steroids', startDate: new Date('2021-05-01'), endDate: new Date('2022-12-01'), reasonDiscontinued: 'Inadequate response' }
-      ],
-      fills: generateQuarterlyFills('Dupixent', 100)
-    }
+  });
+
+  // Add pharmacy claims
+  const fillDates = [
+    new Date('2024-07-01'),
+    new Date('2024-10-01'),
+    new Date('2025-01-01'),
   ];
 
-  for (const patientData of patients) {
-    const patient = await prisma.patient.create({
+  for (const fillDate of fillDates) {
+    await prisma.pharmacyClaim.create({
       data: {
-        ...patientData.info,
-        insurancePlanId: plan.id
-      }
+        patientId: patient1.id,
+        drugName: 'Humira',
+        ndcCode: '00000-0000-01',
+        fillDate,
+        daysSupply: 90,
+        quantity: 6,
+        outOfPocket: decimal(850),
+        planPaid: decimal(20000),
+      },
     });
-
-    await prisma.currentMedication.create({
-      data: {
-        patientId: patient.id,
-        ...patientData.currentMedication
-      }
-    });
-
-    for (const history of patientData.claimsHistory) {
-      await prisma.claimsHistory.create({
-        data: {
-          patientId: patient.id,
-          ...history
-        }
-      });
-    }
-
-    for (const fill of patientData.fills) {
-      await prisma.pharmacyClaim.create({
-        data: {
-          patientId: patient.id,
-          drugName: patientData.currentMedication.drugName,
-          ndcCode: '00000-0000',
-          fillDate: fill.fillDate,
-          daysSupply: 90,
-          quantity: 6,
-          outOfPocket: decimal(fill.opp),
-          planPaid: decimal(fill.opp * 2)
-        }
-      });
-    }
   }
 
-  console.log('Seed data created successfully', { providerId: provider.id });
-}
+  const patient2 = await prisma.patient.create({
+    data: {
+      externalId: 'P002',
+      firstName: 'Jane',
+      lastName: 'Smith',
+      dateOfBirth: new Date('1985-07-22'),
+      planId: plan.id,
+    },
+  });
 
-function generateQuarterlyFills(drugName: string, oopMonthly: number) {
-  const fills = [] as Array<{ fillDate: Date; opp: number }>;
-  const baseDate = new Date('2024-01-01');
-  for (let i = 0; i < 6; i++) {
-    const fillDate = new Date(baseDate);
-    fillDate.setMonth(baseDate.getMonth() + i * 3);
-    fills.push({ fillDate, opp: oopMonthly });
-  }
-  return fills;
+  // Jane - on Cosentyx (Tier 2), stable, candidate for dose reduction
+  await prisma.currentBiologic.create({
+    data: {
+      patientId: patient2.id,
+      drugName: 'Cosentyx',
+      dose: '300mg',
+      frequency: 'Q4W',
+      route: 'SC',
+      startDate: new Date('2023-06-01'),
+      lastFillDate: new Date('2025-01-01'),
+    },
+  });
+
+  const patient3 = await prisma.patient.create({
+    data: {
+      externalId: 'P003',
+      firstName: 'Bob',
+      lastName: 'Johnson',
+      dateOfBirth: new Date('1972-11-03'),
+      planId: plan.id,
+    },
+  });
+
+  // Bob - on Tremfya (Tier 3), unstable disease
+  await prisma.currentBiologic.create({
+    data: {
+      patientId: patient3.id,
+      drugName: 'Tremfya',
+      dose: '100mg',
+      frequency: 'Q8W',
+      route: 'SC',
+      startDate: new Date('2023-12-01'),
+      lastFillDate: new Date('2025-01-01'),
+    },
+  });
+
+  // Add contraindication for Bob (heart failure - contraindicated for TNF inhibitors)
+  await prisma.contraindication.create({
+    data: {
+      patientId: patient3.id,
+      type: 'HEART_FAILURE',
+      details: 'NYHA Class II heart failure',
+    },
+  });
+
+  console.log('Created 3 sample patients');
+
+  // Create sample knowledge documents
+  await prisma.knowledgeDocument.create({
+    data: {
+      title: 'Biosimilar Switching Guidelines',
+      content: `Biosimilars are biological products highly similar to FDA-approved reference products with no clinically meaningful differences in safety, purity, and potency. Clinical studies demonstrate that switching from reference biologics to biosimilars in stable patients is safe and effective. The NOR-SWITCH trial (Lancet 2017) showed non-inferiority of switching from originator infliximab to biosimilar in multiple immune-mediated inflammatory diseases. For adalimumab biosimilars, real-world evidence supports safe switching in psoriasis patients with maintained disease control.`,
+      category: 'BIOSIMILAR_EVIDENCE',
+      sourceUrl: 'https://www.thelancet.com/journals/lancet/article/PIIS0140-6736(17)30068-5',
+    },
+  });
+
+  await prisma.knowledgeDocument.create({
+    data: {
+      title: 'Dose Reduction Strategies for Biologics',
+      content: `Dose reduction or interval extension of biologic therapy in stable psoriasis patients may be considered to reduce costs while maintaining disease control. Studies suggest that patients with PASI <3 or DLQI ≤5 for at least 6 months may be candidates for cautious dose de-escalation. The CONDOR trial demonstrated successful dose reduction in 40% of patients with stable disease on adalimumab. Close monitoring is essential, with DLQI assessments at 3 and 6 months post-reduction. Be prepared to resume standard dosing if disease activity increases.`,
+      category: 'DOSE_REDUCTION',
+    },
+  });
+
+  await prisma.knowledgeDocument.create({
+    data: {
+      title: 'Formulary Management Best Practices',
+      content: `Value-based formulary design prioritizes biosimilars and preferred agents with demonstrated efficacy and cost-effectiveness. Step therapy requirements for higher-tier agents ensure appropriate sequencing. Prior authorization should be streamlined for formulary-preferred options while non-preferred agents require clinical justification. Consider patient out-of-pocket costs when making recommendations, as high copays can reduce adherence and outcomes.`,
+      category: 'FORMULARY_STRATEGY',
+    },
+  });
+
+  console.log('Created knowledge base documents');
+  console.log('Seed data completed successfully!');
 }
 
 main()
-  .catch((error) => {
-    console.error(error);
+  .catch((e) => {
+    console.error(e);
     process.exit(1);
   })
   .finally(async () => {

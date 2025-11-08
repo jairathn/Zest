@@ -2,32 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: 0 0% 100%;
-  --foreground: 210 20% 15%;
-  --muted: 210 16% 93%;
-  --muted-foreground: 210 15% 35%;
-  --popover: 0 0% 100%;
-  --card: 0 0% 100%;
-  --border: 210 16% 82%;
-  --input: 210 16% 82%;
-  --ring: 184 73% 25%;
-  --radius: 0.75rem;
+@layer base {
+  * {
+    @apply border-gray-200;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+
+  h1 {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  h2 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  h3 {
+    @apply text-xl font-semibold;
+  }
 }
 
-body {
-  @apply bg-slate-50 text-slate-900 font-sans;
-}
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors;
+  }
 
-main {
-  @apply min-h-screen bg-slate-50;
-}
+  .btn-primary {
+    @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800;
+  }
 
-::-webkit-scrollbar {
-  width: 10px;
-}
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-900 hover:bg-gray-300 active:bg-gray-400;
+  }
 
-::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 95, 115, 0.4);
-  border-radius: 9999px;
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 active:bg-red-800;
+  }
+
+  .card {
+    @apply bg-white rounded-lg border shadow-sm p-6;
+  }
+
+  .input {
+    @apply px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
 }

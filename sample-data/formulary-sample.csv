@@ -1,0 +1,10 @@
+Drug Name,Generic Name,Drug Class,Tier,Annual Cost,Copay T1,Copay T2,Copay T3,PA Required,Biosimilar Of
+Humira,adalimumab,TNF,3,84000,850,850,10200,Yes,
+Amjevita,adalimumab-atto,TNF,1,28500,25,300,300,No,Humira
+Hyrimoz,adalimumab-adaz,TNF,1,29000,25,300,300,No,Humira
+Cosentyx,secukinumab,IL17,2,68000,100,1200,1200,No,
+Taltz,ixekizumab,IL17,3,72000,850,850,10200,Yes,
+Skyrizi,risankizumab,IL23,2,75000,100,1200,1200,No,
+Tremfya,guselkumab,IL23,3,78000,850,850,10200,Yes,
+Dupixent,dupilumab,IL4/IL13,2,48000,100,1200,1200,No,
+Stelara,ustekinumab,IL12/IL23,3,89000,850,850,10200,Yes,

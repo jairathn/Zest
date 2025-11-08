@@ -1,15 +1,12 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-}
-
-enum UserRole {
-  ADMIN
-  PROVIDER
+  extensions = [vector]
 }
 
 enum DrugClass {
@@ -24,96 +21,76 @@ enum DrugClass {
 
 enum DiagnosisType {
   PSORIASIS
-  ECZEMA
+  ATOPIC_DERMATITIS
   HIDRADENITIS_SUPPURATIVA
   OTHER
 }
 
-enum SeverityScoreType {
-  PASI
-  EASI
-  IGA
-  PGA
+enum ContraindicationType {
+  DRUG_ALLERGY
+  HEART_FAILURE
+  MULTIPLE_SCLEROSIS
+  INFLAMMATORY_BOWEL_DISEASE
+  ACTIVE_INFECTION
+  PREGNANCY
+  HEPATIC_IMPAIRMENT
+  RENAL_IMPAIRMENT
+  IMMUNOCOMPROMISED
+  OTHER
 }
 
-enum StabilityStatus {
-  STABLE
-  UNSTABLE
+enum RecommendationType {
+  DOSE_REDUCTION
+  SWITCH_TO_BIOSIMILAR
+  SWITCH_TO_PREFERRED
+  OPTIMIZE_CURRENT
+  THERAPEUTIC_SWITCH
 }
 
-enum FormularyStatus {
-  OPTIMAL
-  SUBOPTIMAL
-  NON_FORMULARY
-}
-
-enum ProviderDecision {
+enum DecisionStatus {
+  PENDING
   ACCEPTED
   REJECTED
   MODIFIED
-  PENDING
 }
 
-enum OutcomeStatus {
-  IMPROVED
-  MAINTAINED
-  WORSENED
-}
-
-enum KnowledgeDocumentType {
-  GUIDELINE
-  FORMULARY
-  EVIDENCE
-  COST_DATA
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  npi       String?
-  role      UserRole @default(PROVIDER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  assessments ClinicalAssessment[] @relation("AssessmentUser")
-  decisions    Recommendation[]     @relation("RecommendationDecider")
-}
+// ============================================
+// CORE ENTITIES
+// ============================================
 
 model InsurancePlan {
-  id               String          @id @default(cuid())
+  id               String   @id @default(cuid())
   planName         String
   payerName        String
   effectiveDate    DateTime?
   formularyVersion String?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   patients       Patient[]
   formularyDrugs FormularyDrug[]
 }
 
 model Patient {
-  id             String             @id @default(cuid())
-  externalId     String?            @unique
-  firstName      String
-  lastName       String
-  dateOfBirth    DateTime
-  insurancePlanId String
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  id            String    @id @default(cuid())
+  externalId    String?   @unique
+  firstName     String
+  lastName      String
+  dateOfBirth   DateTime
+  planId        String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  insurancePlan     InsurancePlan @relation(fields: [insurancePlanId], references: [id])
-  currentMedication CurrentMedication?
-  claimsHistory     ClaimsHistory[]
-  pharmacyClaims    PharmacyClaim[]
-  assessments       ClinicalAssessment[]
+  plan              InsurancePlan      @relation(fields: [planId], references: [id])
+  currentBiologics  CurrentBiologic[]
+  claims            PharmacyClaim[]
+  contraindications Contraindication[]
+  assessments       Assessment[]
   recommendations   Recommendation[]
 }
 
 model FormularyDrug {
-  id                  String     @id @default(cuid())
+  id                  String    @id @default(cuid())
   planId              String
   drugName            String
   genericName         String
@@ -126,143 +103,168 @@ model FormularyDrug {
   memberCopayT2       Decimal?  @db.Decimal(10, 2)
   memberCopayT3       Decimal?  @db.Decimal(10, 2)
   biosimilarOf        String?
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  approvedIndications String[]  @default([])
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   plan InsurancePlan @relation(fields: [planId], references: [id])
 
   @@index([planId, drugName])
+  @@index([drugName])
+}
+
+model CurrentBiologic {
+  id           String   @id @default(cuid())
+  patientId    String
+  drugName     String
+  dose         String
+  frequency    String
+  route        String
+  startDate    DateTime
+  lastFillDate DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
 }
 
 model PharmacyClaim {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   patientId   String
   drugName    String
   ndcCode     String?
   fillDate    DateTime
   daysSupply  Int
   quantity    Int
-  outOfPocket Decimal?  @db.Decimal(10, 2)
-  planPaid    Decimal?  @db.Decimal(12, 2)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  outOfPocket Decimal? @db.Decimal(10, 2)
+  planPaid    Decimal? @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
 
-  patient Patient @relation(fields: [patientId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
-  @@index([patientId, drugName])
+  @@index([patientId, fillDate])
+  @@index([drugName])
 }
 
-model CurrentMedication {
-  id            String    @id @default(cuid())
-  patientId     String    @unique
-  drugName      String
-  dose          String
-  frequency     String
-  route         String
-  startDate     DateTime
-  lastFillDate  DateTime?
-  adherencePDC  Decimal?  @db.Decimal(5, 2)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+model Contraindication {
+  id         String                @id @default(cuid())
+  patientId  String
+  type       ContraindicationType
+  details    String?
+  recordedAt DateTime              @default(now())
 
-  patient Patient @relation(fields: [patientId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
 }
 
-model ClaimsHistory {
-  id                 String   @id @default(cuid())
-  patientId          String
-  drugName           String
-  startDate          DateTime
-  endDate            DateTime?
-  reasonDiscontinued String?
-  createdAt          DateTime @default(now())
+// ============================================
+// ASSESSMENT & RECOMMENDATIONS
+// ============================================
 
-  patient Patient @relation(fields: [patientId], references: [id])
-}
-
-model ClinicalAssessment {
-  id                     String           @id @default(cuid())
+model Assessment {
+  id                     String         @id @default(cuid())
   patientId              String
-  assessedBy             String
-  assessmentDate         DateTime
   diagnosis              DiagnosisType
-  severityScoreType      SeverityScoreType
-  severityScore          Decimal @db.Decimal(6, 2)
-  severityDurationMonths Int
-  dlqiScore              Int
-  adverseEvents          String?
-  comorbidities          String?
-  providerNotes          String?
-  createdAt              DateTime @default(now())
+  hasPsoriaticArthritis  Boolean        @default(false)
+  dlqiScore              Int            // 0-30
+  monthsStable           Int
+  additionalNotes        String?
+  assessedAt             DateTime       @default(now())
 
-  patient Patient @relation(fields: [patientId], references: [id])
-  assessor User    @relation("AssessmentUser", fields: [assessedBy], references: [id])
+  patient         Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
   recommendations Recommendation[]
-  followupFor  Recommendation[] @relation("RecommendationFollowup")
-}
 
-enum RecommendationStabilityStatus {
-  STABLE
-  UNSTABLE
-}
-
-enum RecommendationFormularyStatus {
-  OPTIMAL
-  SUBOPTIMAL
-  NON_FORMULARY
-}
-
-enum RecommendationOutcomeStatus {
-  IMPROVED
-  MAINTAINED
-  WORSENED
+  @@index([patientId])
 }
 
 model Recommendation {
-  id                      String                          @id @default(cuid())
-  patientId               String
+  id                      String             @id @default(cuid())
   assessmentId            String
-  generatedAt             DateTime                        @default(now())
-  llmModel                String
-  stabilityStatus         RecommendationStabilityStatus
-  formularyStatus         RecommendationFormularyStatus
+  patientId               String
+
+  // Quadrant classification
+  isStable                Boolean
+  isFormularyOptimal      Boolean
   quadrant                String
-  recommendationsJson     Json
-  providerDecision        ProviderDecision                @default(PENDING)
-  acceptedRecommendationIndex Int?
-  rejectionReason         String?
+
+  // Recommendation details
+  rank                    Int
+  type                    RecommendationType
+  drugName                String
+  newDose                 String?
+  newFrequency            String?
+
+  // Cost analysis
+  currentAnnualCost       Decimal?           @db.Decimal(12, 2)
+  recommendedAnnualCost   Decimal?           @db.Decimal(12, 2)
+  annualSavings           Decimal?           @db.Decimal(12, 2)
+  savingsPercent          Decimal?           @db.Decimal(5, 2)
+  currentMonthlyOOP       Decimal?           @db.Decimal(10, 2)
+  recommendedMonthlyOOP   Decimal?           @db.Decimal(10, 2)
+
+  // Clinical justification
+  rationale               String
+  evidenceSources         String[]           @default([])
+  monitoringPlan          String?
+
+  // Formulary info
+  tier                    Int?
+  requiresPA              Boolean?
+
+  // Safety
+  contraindicated         Boolean            @default(false)
+  contraindicationReason  String?
+
+  // Decision tracking
+  status                  DecisionStatus     @default(PENDING)
   decidedAt               DateTime?
-  decidedBy               String?
-  followupAssessmentId    String?
-  outcomeStatus           RecommendationOutcomeStatus?
-  createdAt               DateTime                        @default(now())
-  updatedAt               DateTime                        @updatedAt
+  rejectionReason         String?
 
-  patient      Patient            @relation(fields: [patientId], references: [id])
-  assessment   ClinicalAssessment @relation(fields: [assessmentId], references: [id])
-  decider      User?              @relation("RecommendationDecider", fields: [decidedBy], references: [id])
-  followup     ClinicalAssessment? @relation("RecommendationFollowup", fields: [followupAssessmentId], references: [id])
-  feedback     RecommendationFeedback?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  patient    Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@index([patientId])
+  @@index([status])
 }
 
-model RecommendationFeedback {
-  id                String          @id @default(cuid())
-  recommendationId  String          @unique
-  reasons           Json
-  createdAt         DateTime        @default(now())
-
-  recommendation Recommendation @relation(fields: [recommendationId], references: [id])
-}
+// ============================================
+// KNOWLEDGE BASE (Local RAG with pgvector)
+// ============================================
 
 model KnowledgeDocument {
-  id              String                 @id @default(cuid())
-  docType         KnowledgeDocumentType
+  id              String                        @id @default(cuid())
   title           String
-  content         String
+  content         String                        @db.Text
+  embedding       Unsupported("vector(1536)")?  // OpenAI text-embedding-3-small
+  category        String                        // "CLINICAL_GUIDELINE", "BIOSIMILAR_EVIDENCE", "DOSE_REDUCTION", etc.
+  sourceFile      String?
   sourceUrl       String?
-  publicationDate DateTime?
-  embedding       Unsupported("vector")?
   metadata        Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+
+  @@index([category])
+}
+
+// ============================================
+// DATA UPLOAD TRACKING
+// ============================================
+
+model UploadLog {
+  id             String   @id @default(cuid())
+  uploadType     String   // "FORMULARY", "CLAIMS", "ELIGIBILITY", "KNOWLEDGE"
+  fileName       String
+  rowsProcessed  Int
+  rowsFailed     Int
+  errors         Json?
+  uploadedAt     DateTime @default(now())
+
+  @@index([uploadType, uploadedAt])
 }

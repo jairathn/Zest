@@ -1,74 +1,76 @@
-# Zest Health - Biologics Decision Support Tool
+# Zest Biologic Decision Support System
 
-A Next.js 14 prototype for dermatology biologic optimization with formulary guidance, RAG-enabled LLM decision support, and analytics.
+A simplified MVP for dermatology biologic optimization with cost-saving recommendations.
 
-## Setup
+## Features
 
-1. Make sure you are in the repository root (the folder that contains this README). If you are unsure, run `pwd` and verify the path ends with `/Zest`.
+- 📊 **CSV Upload System** - Upload formulary data, claims data, and patient eligibility
+- 📚 **Local Knowledge Base** - PDF/Markdown upload with pgvector embeddings (no Pinecone!)
+- 🎯 **Simplified Assessment** - Quick patient assessment with auto-population
+- 💰 **Cost Savings** - 1-3 evidence-based recommendations for dose reduction or formulary switches
+- 🔍 **Local RAG** - PostgreSQL + pgvector for document retrieval
 
-2. Install dependencies:
+## Quick Start
 
+1. **Install dependencies:**
 ```bash
 npm install
 ```
 
-3. Configure environment variables (creates `.env` if it is missing):
-
+2. **Set up database:**
 ```bash
-npm run setup:env
-# Then edit the new .env file with your credentials
+# Create .env file
+cp .env.example .env
+# Edit .env with your PostgreSQL connection string
+
+# Push schema to database
+npm run db:push
+
+# Seed with sample data
+npm run db:seed
 ```
 
-4. Set up the database schema and seed mock data:
-
-```bash
-npx prisma db push
-npx prisma db seed
-```
-
-5. Ingest knowledge base embeddings (requires OpenAI + Pinecone credentials):
-
-```bash
-npm run ingest-knowledge
-```
-
-6. Run the development server:
-
+3. **Run development server:**
 ```bash
 npm run dev
 ```
 
-7. Open the app at [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000)
 
-## Test Accounts
+## Architecture
 
-- Provider: `provider@zest.com` / `password123`
-- Admin: `admin@zest.com` / `password123`
+- **Framework:** Next.js 14 (App Router)
+- **Database:** PostgreSQL + pgvector extension
+- **ORM:** Prisma
+- **Styling:** Tailwind CSS
+- **LLM:** OpenAI (optional - falls back to rule-based)
 
-> Password hashes in the seed script are placeholders. Replace with secure hashes before production use.
+## Data Upload
 
-## Test Patients
+Upload CSVs via the admin dashboard:
+- **Formulary:** Drug name, tier, costs, PA requirements
+- **Claims:** Patient ID, drug, fill dates, costs
+- **Eligibility:** Patient demographics and plan info
+- **Knowledge Base:** PDFs or Markdown for clinical evidence
 
-Five mock patients spanning stability and formulary quadrants are seeded. Review `prisma/seed.ts` for clinical narratives and claims data.
+## Simplified Workflow
+
+1. Select patient
+2. Fill simple assessment form (biologic, indication, DLQI, stability)
+3. System auto-populates claims, plan, formulary
+4. Generates 1-3 cost-saving recommendations with evidence
+5. Accept or reject recommendations
 
 ## Tech Stack
 
-- Next.js 14 (App Router) + TypeScript
-- Tailwind CSS + shadcn-inspired UI components
+- Next.js 14 + TypeScript
+- Tailwind CSS
 - Prisma ORM + PostgreSQL
-- OpenAI GPT-4 for recommendations
-- Pinecone for retrieval-augmented generation
-- React Query for data fetching
-- Recharts for analytics visualizations
+- pgvector for embeddings
+- OpenAI API (embeddings + optional LLM)
+- Papa Parse (CSV parsing)
+- pdf-parse (PDF extraction)
 
-## Scripts
+## License
 
-- `npm run dev` – start the development server
-- `npm run build` – production build
-- `npm run start` – run the compiled app
-- `npm run setup:env` – scaffold a `.env` file from the template
-- `npm run ingest-knowledge` – embed knowledge base markdown into Pinecone
-
-## Deployment
-
-Use the included `docker-compose.yml` for local PostgreSQL and `scripts/deploy-vercel.sh` for Vercel deployment scaffolding (to be customized with project details).
+Proprietary
