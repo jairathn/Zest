@@ -54,28 +54,28 @@ npm install
 ### 3. Start and Configure PostgreSQL
 ```bash
 # Disable SSL for dev environment
-sed -i "s/ssl = on/ssl = off/" /etc/postgresql/16/main/postgresql.conf
+sudo sed -i "s/ssl = on/ssl = off/" /etc/postgresql/16/main/postgresql.conf
 
 # Configure authentication
-sed -i 's/peer/trust/g' /etc/postgresql/16/main/pg_hba.conf
+sudo sed -i 's/peer/trust/g' /etc/postgresql/16/main/pg_hba.conf
 
-# Start PostgreSQL
-service postgresql start
+# Start PostgreSQL (if not already running)
+sudo pg_ctlcluster 16 main start 2>/dev/null || echo "PostgreSQL already running"
 
 # Wait for startup
 sleep 2
 
 # Create database
-su - postgres -c "createdb zest_biologic_dss"
+sudo -u postgres createdb zest_biologic_dss 2>/dev/null || echo "Database already exists"
 
 # Set postgres user password
-su - postgres -c "psql -c \"ALTER USER postgres PASSWORD 'password';\""
+sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'password';"
 
 # Enable password authentication
-sed -i 's/trust/md5/g' /etc/postgresql/16/main/pg_hba.conf
+sudo sed -i 's/trust/md5/g' /etc/postgresql/16/main/pg_hba.conf
 
-# Restart PostgreSQL
-service postgresql restart
+# Restart PostgreSQL to apply changes
+sudo pg_ctlcluster 16 main restart
 ```
 
 ### 4. Set Up Database Schema
@@ -93,14 +93,14 @@ npm run dev
 ```bash
 nvm use 20 && \
 npm install && \
-sed -i "s/ssl = on/ssl = off/" /etc/postgresql/16/main/postgresql.conf && \
-sed -i 's/peer/trust/g' /etc/postgresql/16/main/pg_hba.conf && \
-service postgresql start && \
+sudo sed -i "s/ssl = on/ssl = off/" /etc/postgresql/16/main/postgresql.conf && \
+sudo sed -i 's/peer/trust/g' /etc/postgresql/16/main/pg_hba.conf && \
+sudo pg_ctlcluster 16 main start 2>/dev/null && \
 sleep 2 && \
-su - postgres -c "createdb zest_biologic_dss" && \
-su - postgres -c "psql -c \"ALTER USER postgres PASSWORD 'password';\"" && \
-sed -i 's/trust/md5/g' /etc/postgresql/16/main/pg_hba.conf && \
-service postgresql restart && \
+sudo -u postgres createdb zest_biologic_dss 2>/dev/null && \
+sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'password';" && \
+sudo sed -i 's/trust/md5/g' /etc/postgresql/16/main/pg_hba.conf && \
+sudo pg_ctlcluster 16 main restart && \
 sleep 2 && \
 npx prisma db push && \
 npm run dev
