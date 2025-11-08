@@ -115,11 +115,11 @@ export async function searchKnowledge(
       category,
       "sourceFile",
       "sourceUrl",
-      1 - (embedding <=> ${queryEmbedding}::vector) as similarity
+      1 - (embedding <=> ${JSON.stringify(queryEmbedding)}::vector) as similarity
     FROM "KnowledgeDocument"
     WHERE embedding IS NOT NULL
-    ${category ? prisma.$queryRawUnsafe(`AND category = '${category}'`) : prisma.$queryRawUnsafe('')}
-    ORDER BY embedding <=> ${queryEmbedding}::vector
+    ${category ? `AND category = ${category}` : ''}
+    ORDER BY embedding <=> ${JSON.stringify(queryEmbedding)}::vector
     LIMIT ${limit}
   `;
 
