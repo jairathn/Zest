@@ -37,6 +37,75 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
+## Codespace Setup (First-Time Setup)
+
+When opening a new codespace, run these commands in order:
+
+### 1. Switch to Node.js 20
+```bash
+nvm use 20
+```
+
+### 2. Install Dependencies
+```bash
+npm install
+```
+
+### 3. Start and Configure PostgreSQL
+```bash
+# Disable SSL for dev environment
+sed -i "s/ssl = on/ssl = off/" /etc/postgresql/16/main/postgresql.conf
+
+# Configure authentication
+sed -i 's/peer/trust/g' /etc/postgresql/16/main/pg_hba.conf
+
+# Start PostgreSQL
+service postgresql start
+
+# Wait for startup
+sleep 2
+
+# Create database
+su - postgres -c "createdb zest_biologic_dss"
+
+# Set postgres user password
+su - postgres -c "psql -c \"ALTER USER postgres PASSWORD 'password';\""
+
+# Enable password authentication
+sed -i 's/trust/md5/g' /etc/postgresql/16/main/pg_hba.conf
+
+# Restart PostgreSQL
+service postgresql restart
+```
+
+### 4. Set Up Database Schema
+```bash
+# Push Prisma schema to database
+npx prisma db push
+```
+
+### 5. Start Development Server
+```bash
+npm run dev
+```
+
+**All-in-One Command** (Copy-paste this entire block):
+```bash
+nvm use 20 && \
+npm install && \
+sed -i "s/ssl = on/ssl = off/" /etc/postgresql/16/main/postgresql.conf && \
+sed -i 's/peer/trust/g' /etc/postgresql/16/main/pg_hba.conf && \
+service postgresql start && \
+sleep 2 && \
+su - postgres -c "createdb zest_biologic_dss" && \
+su - postgres -c "psql -c \"ALTER USER postgres PASSWORD 'password';\"" && \
+sed -i 's/trust/md5/g' /etc/postgresql/16/main/pg_hba.conf && \
+service postgresql restart && \
+sleep 2 && \
+npx prisma db push && \
+npm run dev
+```
+
 ## Architecture
 
 - **Framework:** Next.js 14 (App Router)
