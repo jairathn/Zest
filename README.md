@@ -95,6 +95,13 @@ npx prisma db push
 ```
 
 ### 5. Start Development Server
+
+**Clean start (kills any stuck ports first - recommended):**
+```bash
+fuser -k 3000/tcp 2>/dev/null; fuser -k 3001/tcp 2>/dev/null; fuser -k 3002/tcp 2>/dev/null; npm run dev
+```
+
+Or just:
 ```bash
 npm run dev
 ```
