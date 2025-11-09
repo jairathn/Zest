@@ -123,6 +123,18 @@ npx prisma db push && \
 npm run dev
 ```
 
+## Troubleshooting
+
+### "Can't reach database server at localhost:5432" Error
+
+If you get this error when uploading data or generating recommendations, PostgreSQL stopped running. Run this:
+
+```bash
+docker-compose up -d && sleep 3 && fuser -k 3000/tcp 2>/dev/null; npm run dev
+```
+
+This starts the database, waits for it to be ready, kills any stuck dev server, and starts fresh.
+
 ## Architecture
 
 - **Framework:** Next.js 14 (App Router)
