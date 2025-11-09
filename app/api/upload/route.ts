@@ -265,9 +265,22 @@ async function handleEligibilityUpload(csvText: string, fileName: string) {
 }
 
 async function handleKnowledgeUpload(file: File) {
-  // For now, just store the file content
-  // TODO: Implement PDF parsing and embedding generation
-  const text = await file.text();
+  let text = '';
+
+  if (file.name.endsWith('.pdf')) {
+    // For PDFs, use pdf-parse
+    const pdf = require('pdf-parse');
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const data = await pdf(buffer);
+    text = data.text;
+  } else {
+    // For markdown/text files
+    text = await file.text();
+  }
+
+  // Strip null bytes that PostgreSQL doesn't like
+  text = text.replace(/\0/g, '');
 
   await prisma.knowledgeDocument.create({
     data: {
