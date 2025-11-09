@@ -49,7 +49,12 @@ export default async function RecommendationsPage({ params }: PageProps) {
         <div className="flex items-center gap-6 text-sm text-gray-600">
           <span>Plan: {assessment.patient.plan.planName}</span>
           <span>•</span>
-          <span>Current: {currentBiologic?.drugName || 'None'} {currentBiologic?.dose} {currentBiologic?.frequency}</span>
+          <span>
+            Current: {currentBiologic?.drugName || 'None'} {currentBiologic?.dose} {currentBiologic?.frequency}
+            {assessment.recommendations.length > 0 && assessment.recommendations[0]?.tier && (
+              <> • Tier {assessment.recommendations[0].tier}</>
+            )}
+          </span>
         </div>
       </div>
 
@@ -66,10 +71,12 @@ export default async function RecommendationsPage({ params }: PageProps) {
             <div className="text-sm text-gray-600 space-y-1">
               <p>
                 <strong>Stability:</strong>{' '}
-                {assessment.recommendations[0]?.isStable ? (
+                {assessment.recommendations.length > 0 && assessment.recommendations[0]?.isStable ? (
                   <span className="text-green-700">Stable</span>
-                ) : (
+                ) : assessment.recommendations.length > 0 ? (
                   <span className="text-amber-700">Unstable</span>
+                ) : (
+                  <span className="text-gray-500">Unknown</span>
                 )}{' '}
                 (DLQI: {assessment.dlqiScore}, {assessment.monthsStable} months)
               </p>

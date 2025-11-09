@@ -176,33 +176,46 @@ Based on this information, generate 1-3 specific cost-saving recommendations. Fo
 5. Detailed rationale citing clinical evidence
 6. Monitoring plan
 
-Return ONLY a JSON array with this exact structure:
-[
-  {
-    "type": "DOSE_REDUCTION",
-    "drugName": "string or null",
-    "newDose": "string or null",
-    "newFrequency": "string or null",
-    "rationale": "string",
-    "monitoringPlan": "string",
-    "rank": number
+Return ONLY a JSON object with this exact structure:
+{
+  "recommendations": [
+    {
+      "type": "DOSE_REDUCTION",
+      "drugName": "string or null",
+      "newDose": "string or null",
+      "newFrequency": "string or null",
+      "rationale": "string",
+      "monitoringPlan": "string",
+      "rank": number
+    }
+  ]
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0.4,
+    });
+
+    const content = response.choices[0].message.content || '{}';
+    console.log('LLM Response:', content); // Debug logging
+    const parsed = JSON.parse(content);
+
+    // Handle both array and object responses
+    const recommendations = Array.isArray(parsed) ? parsed : (parsed.recommendations || []);
+
+    if (!Array.isArray(recommendations) || recommendations.length === 0) {
+      console.error('LLM returned no recommendations, response was:', content);
+      throw new Error('LLM returned no recommendations');
+    }
+
+    return recommendations as LLMRecommendation[];
+  } catch (error) {
+    console.error('Error getting LLM recommendations:', error);
+    throw error; // Re-throw to trigger fallback
   }
-]`;
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: prompt }],
-    response_format: { type: 'json_object' },
-    temperature: 0.4,
-  });
-
-  const content = response.choices[0].message.content || '{}';
-  const parsed = JSON.parse(content);
-
-  // Handle both array and object responses
-  const recommendations = Array.isArray(parsed) ? parsed : (parsed.recommendations || []);
-
-  return recommendations as LLMRecommendation[];
 }
 
 /**

@@ -27,19 +27,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Generate recommendations using LLM if available, otherwise use rule-based
+    // Generate recommendations using LLM if available, with fallback to rule-based
     const useLLM = !!process.env.OPENAI_API_KEY;
+    let result;
 
-    const result = useLLM
-      ? await generateLLMRecommendations({
-          patientId,
-          diagnosis,
-          hasPsoriaticArthritis: hasPsoriaticArthritis || false,
-          dlqiScore: Number(dlqiScore),
-          monthsStable: Number(monthsStable),
-          additionalNotes,
-        })
-      : await generateRecommendations({
+    if (useLLM) {
+      try {
+        console.log('Attempting LLM-based recommendations...');
+        result = await generateLLMRecommendations({
           patientId,
           diagnosis,
           hasPsoriaticArthritis: hasPsoriaticArthritis || false,
@@ -47,6 +42,29 @@ export async function POST(request: NextRequest) {
           monthsStable: Number(monthsStable),
           additionalNotes,
         });
+        console.log(`LLM generated ${result.recommendations.length} recommendations`);
+      } catch (error: any) {
+        console.error('LLM recommendations failed, falling back to rule-based:', error.message);
+        result = await generateRecommendations({
+          patientId,
+          diagnosis,
+          hasPsoriaticArthritis: hasPsoriaticArthritis || false,
+          dlqiScore: Number(dlqiScore),
+          monthsStable: Number(monthsStable),
+          additionalNotes,
+        });
+        console.log(`Rule-based generated ${result.recommendations.length} recommendations`);
+      }
+    } else {
+      result = await generateRecommendations({
+        patientId,
+        diagnosis,
+        hasPsoriaticArthritis: hasPsoriaticArthritis || false,
+        dlqiScore: Number(dlqiScore),
+        monthsStable: Number(monthsStable),
+        additionalNotes,
+      });
+    }
 
     // Save recommendations
     await Promise.all(
