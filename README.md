@@ -130,7 +130,7 @@ npm run dev
 If you get this error when uploading data or generating recommendations, PostgreSQL stopped running. Run this:
 
 ```bash
-docker-compose up -d && sleep 3 && fuser -k 3000/tcp 2>/dev/null; npm run dev
+pg_ctlcluster 16 main start && sleep 2 && fuser -k 3000/tcp 2>/dev/null; npm run dev
 ```
 
 This starts the database, waits for it to be ready, kills any stuck dev server, and starts fresh.
