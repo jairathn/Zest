@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Upload, CheckCircle, AlertCircle, FileSpreadsheet, Database, Users, BookOpen } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, FileSpreadsheet, Database, Users, BookOpen, FolderOpen } from 'lucide-react';
+import Link from 'next/link';
 
 type UploadType = 'formulary' | 'claims' | 'eligibility' | 'knowledge';
 
@@ -185,11 +186,20 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="mb-8">
-        <h1 className="mb-2">Data Upload</h1>
-        <p className="text-gray-600">
-          Upload CSV files for formulary data, pharmacy claims, and patient eligibility
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="mb-2">Data Upload</h1>
+          <p className="text-gray-600">
+            Upload CSV files for formulary data, pharmacy claims, and patient eligibility
+          </p>
+        </div>
+        <Link
+          href="/admin/data"
+          className="btn btn-secondary inline-flex items-center"
+        >
+          <FolderOpen className="w-4 h-4 mr-2" />
+          Manage Data
+        </Link>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
