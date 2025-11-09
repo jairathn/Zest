@@ -17,28 +17,73 @@ export default function AdminPage() {
   const [uploading, setUploading] = useState<UploadType | null>(null);
   const [results, setResults] = useState<Record<string, UploadResult>>({});
 
-  const handleUpload = async (type: UploadType, file: File) => {
+  const handleUpload = async (type: UploadType, files: FileList) => {
     setUploading(type);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('type', type);
 
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+    // For knowledge base, support multiple files
+    if (type === 'knowledge' && files.length > 1) {
+      const results: UploadResult[] = [];
+      let totalProcessed = 0;
+      let totalFailed = 0;
 
-      const result = await res.json();
-      setResults(prev => ({ ...prev, [type]: result }));
-    } catch (error: any) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', type);
+
+        try {
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const result = await res.json();
+          results.push(result);
+          if (result.success) {
+            totalProcessed += result.rowsProcessed || 0;
+          } else {
+            totalFailed++;
+          }
+        } catch (error: any) {
+          totalFailed++;
+          results.push({ success: false, message: `${file.name}: ${error.message}` });
+        }
+      }
+
       setResults(prev => ({
         ...prev,
-        [type]: { success: false, message: error.message }
+        [type]: {
+          success: totalFailed < files.length,
+          rowsProcessed: totalProcessed,
+          rowsFailed: totalFailed,
+          message: `Uploaded ${totalProcessed} files (${totalFailed} failed)`
+        }
       }));
-    } finally {
-      setUploading(null);
+    } else {
+      // Single file upload for CSVs or single knowledge file
+      const file = files[0];
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', type);
+
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const result = await res.json();
+        setResults(prev => ({ ...prev, [type]: result }));
+      } catch (error: any) {
+        setResults(prev => ({
+          ...prev,
+          [type]: { success: false, message: error.message }
+        }));
+      }
     }
+
+    setUploading(null);
   };
 
   const UploadCard = ({
@@ -79,9 +124,10 @@ export default function AdminPage() {
                 type="file"
                 className="hidden"
                 accept={acceptedFormats}
+                multiple={type === 'knowledge'}
                 onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleUpload(type, file);
+                  const files = e.target.files;
+                  if (files && files.length > 0) handleUpload(type, files);
                 }}
                 disabled={isUploading}
               />
@@ -174,7 +220,7 @@ export default function AdminPage() {
         <UploadCard
           type="knowledge"
           title="Knowledge Base"
-          description="Upload clinical guidelines and evidence documents"
+          description="Upload clinical guidelines and evidence documents (supports multiple files)"
           icon={BookOpen}
           acceptedFormats=".pdf,.md,.txt"
         />

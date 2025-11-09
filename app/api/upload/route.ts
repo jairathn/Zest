@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db';
 import { parseFormularyCSV } from '@/lib/parsers/formulary-parser';
 import { parseClaimsCSV } from '@/lib/parsers/claims-parser';
 import { parseEligibilityCSV } from '@/lib/parsers/eligibility-parser';
+import { chunkTextByParagraph } from '@/lib/text-chunker';
+import { generateEmbedding } from '@/lib/rag/embeddings';
 
 export async function POST(request: NextRequest) {
   try {
@@ -282,27 +284,64 @@ async function handleKnowledgeUpload(file: File) {
   // Strip null bytes that PostgreSQL doesn't like
   text = text.replace(/\0/g, '');
 
-  await prisma.knowledgeDocument.create({
-    data: {
-      title: file.name,
-      content: text,
-      category: 'CLINICAL_GUIDELINE',
-      sourceFile: file.name,
-    },
-  });
+  // Chunk the text using paragraph-based chunking
+  const chunks = chunkTextByParagraph(text, 700, 100);
+
+  let successCount = 0;
+  let failCount = 0;
+
+  // Generate embeddings and store each chunk
+  for (const chunk of chunks) {
+    try {
+      const embedding = await generateEmbedding(chunk.content);
+      const embeddingStr = `[${embedding.join(',')}]`;
+
+      // Store chunk with embedding using raw SQL
+      await prisma.$queryRawUnsafe(`
+        INSERT INTO "KnowledgeDocument" (
+          id,
+          title,
+          content,
+          embedding,
+          category,
+          "sourceFile",
+          metadata,
+          "createdAt",
+          "updatedAt"
+        )
+        VALUES (
+          gen_random_uuid()::text,
+          $1,
+          $2,
+          $3::vector,
+          'CLINICAL_GUIDELINE',
+          $4,
+          '{"chunkIndex": ${chunk.index}}'::jsonb,
+          NOW(),
+          NOW()
+        )
+      `, `${file.name} (chunk ${chunk.index})`, chunk.content, embeddingStr, file.name);
+
+      successCount++;
+    } catch (error: any) {
+      console.error(`Error processing chunk ${chunk.index}:`, error);
+      failCount++;
+    }
+  }
 
   await prisma.uploadLog.create({
     data: {
       uploadType: 'KNOWLEDGE',
       fileName: file.name,
-      rowsProcessed: 1,
-      rowsFailed: 0,
+      rowsProcessed: successCount,
+      rowsFailed: failCount,
     },
   });
 
   return NextResponse.json({
-    success: true,
-    rowsProcessed: 1,
-    rowsFailed: 0,
+    success: successCount > 0,
+    rowsProcessed: successCount,
+    rowsFailed: failCount,
+    message: successCount > 0 ? `Successfully processed ${successCount} chunks from ${file.name}` : 'Failed to process file',
   });
 }

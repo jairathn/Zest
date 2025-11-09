@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { generateRecommendations } from '@/lib/decision-engine';
+import { generateLLMRecommendations } from '@/lib/llm-decision-engine';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,15 +27,26 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Generate recommendations
-    const result = await generateRecommendations({
-      patientId,
-      diagnosis,
-      hasPsoriaticArthritis: hasPsoriaticArthritis || false,
-      dlqiScore: Number(dlqiScore),
-      monthsStable: Number(monthsStable),
-      additionalNotes,
-    });
+    // Generate recommendations using LLM if available, otherwise use rule-based
+    const useLLM = !!process.env.OPENAI_API_KEY;
+
+    const result = useLLM
+      ? await generateLLMRecommendations({
+          patientId,
+          diagnosis,
+          hasPsoriaticArthritis: hasPsoriaticArthritis || false,
+          dlqiScore: Number(dlqiScore),
+          monthsStable: Number(monthsStable),
+          additionalNotes,
+        })
+      : await generateRecommendations({
+          patientId,
+          diagnosis,
+          hasPsoriaticArthritis: hasPsoriaticArthritis || false,
+          dlqiScore: Number(dlqiScore),
+          monthsStable: Number(monthsStable),
+          additionalNotes,
+        });
 
     // Save recommendations
     await Promise.all(
