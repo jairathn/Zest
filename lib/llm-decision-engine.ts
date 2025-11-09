@@ -44,12 +44,44 @@ interface LLMRecommendation {
 }
 
 /**
- * Step 1: LLM Triage - Determine if patient is candidate for dose reduction, switch, both, or neither
+ * Determine formulary status and quadrant using hard-coded rules
+ */
+function determineQuadrantAndStatus(
+  dlqiScore: number,
+  monthsStable: number,
+  currentFormularyDrug: FormularyDrug | null
+): { isStable: boolean; isFormularyOptimal: boolean; quadrant: string } {
+  // Stability: DLQI ≤5 and ≥6 months stable
+  const isStable = dlqiScore <= 5 && monthsStable >= 6;
+
+  // Formulary optimal: Tier 1-2 AND no PA required
+  const isFormularyOptimal = currentFormularyDrug
+    ? (currentFormularyDrug.tier <= 2 && !currentFormularyDrug.requiresPA)
+    : false;
+
+  // Determine quadrant
+  let quadrant: string;
+  if (isStable && isFormularyOptimal) {
+    quadrant = 'stable_formulary_aligned';
+  } else if (isStable && !isFormularyOptimal) {
+    quadrant = 'stable_non_formulary';
+  } else if (!isStable && isFormularyOptimal) {
+    quadrant = 'unstable_formulary_aligned';
+  } else {
+    quadrant = 'unstable_non_formulary';
+  }
+
+  return { isStable, isFormularyOptimal, quadrant };
+}
+
+/**
+ * Step 1: LLM Triage - Get clinical reasoning and recommendation strategy
  */
 async function triagePatient(
   assessment: AssessmentInput,
   currentDrug: string,
-  formularyDrug: FormularyDrug | null
+  formularyDrug: FormularyDrug | null,
+  quadrant: string
 ): Promise<TriageResult> {
   const prompt = `You are a clinical decision support AI for dermatology biologic optimization.
 
@@ -64,29 +96,25 @@ Patient Information:
 Formulary Status:
 - Tier: ${formularyDrug?.tier || 'Unknown'}
 - Requires PA: ${formularyDrug?.requiresPA ? 'Yes' : 'No'}
+- Classification: ${quadrant.replace(/_/g, ' ').toUpperCase()}
 
-IMPORTANT FORMULARY RULES:
-- Tier 1-2 without PA = OPTIMAL formulary position
-- Tier 3+ OR requires PA = NON-OPTIMAL (suboptimal) formulary position
-- If Tier 3+, patient should be considered for switch to lower tier alternative
+The patient has been classified as: ${quadrant}
+- stable_formulary_aligned: Stable + Tier 1-2 without PA → Consider dose reduction
+- stable_non_formulary: Stable + Tier 3+ or PA required → MUST recommend formulary switch
+- unstable_formulary_aligned: Unstable + Tier 1-2 → Optimize current therapy
+- unstable_non_formulary: Unstable + Tier 3+ → Consider therapeutic switch
 
-Based on this information, determine:
-1. Is the patient stable enough to consider dose reduction? (DLQI ≤5 and stable ≥6 months typically required)
-2. Is a formulary switch recommended? (YES if Tier 3+ or PA required, especially when stable)
-3. What quadrant is the patient in?
-   - stable_formulary_aligned: Stable disease AND Tier 1-2 without PA
-   - stable_non_formulary: Stable disease BUT Tier 3+ OR PA required
-   - unstable_formulary_aligned: Unstable disease AND Tier 1-2 without PA
-   - unstable_non_formulary: Unstable disease AND (Tier 3+ OR PA required)
-
-CRITICAL: If current drug is Tier 3+, the quadrant MUST be "stable_non_formulary" or "unstable_non_formulary" depending on stability.
+Based on the quadrant "${quadrant}", determine:
+1. Should dose reduction be considered? (Only for stable_formulary_aligned)
+2. Should formulary switch be recommended? (YES for any "non_formulary" quadrant)
+3. Provide clinical reasoning
 
 Return ONLY a JSON object with this exact structure:
 {
   "canDoseReduce": boolean,
   "shouldSwitch": boolean,
-  "quadrant": string,
-  "reasoning": string
+  "quadrant": "${quadrant}",
+  "reasoning": "string"
 }`;
 
   const response = await openai.chat.completions.create({
@@ -101,7 +129,7 @@ Return ONLY a JSON object with this exact structure:
 }
 
 /**
- * Step 2: Targeted RAG Retrieval based on triage result
+ * Step 3: Targeted RAG Retrieval based on triage result
  */
 async function retrieveRelevantEvidence(
   drugName: string,
@@ -139,7 +167,7 @@ async function retrieveRelevantEvidence(
 }
 
 /**
- * Step 3: LLM Decision-Making with retrieved context
+ * Step 4: LLM Decision-Making with retrieved context
  */
 async function getLLMRecommendationSuggestions(
   assessment: AssessmentInput,
@@ -242,7 +270,7 @@ Return ONLY a JSON object with this exact structure:
 }
 
 /**
- * Step 4: Calculate cost savings
+ * Step 5: Calculate cost savings
  */
 function calculateCostSavings(
   recommendation: LLMRecommendation,
@@ -326,11 +354,19 @@ export async function generateLLMRecommendations(
     drug => drug.drugName.toLowerCase() === genericDrugName.toLowerCase()
   );
 
-  // Step 1: LLM Triage
-  const triage = await triagePatient(assessment, genericDrugName, currentFormularyDrug || null);
+  // Step 1: Determine quadrant using hard-coded rules (don't trust LLM for this)
+  const { isStable, isFormularyOptimal, quadrant } = determineQuadrantAndStatus(
+    assessment.dlqiScore,
+    assessment.monthsStable,
+    currentFormularyDrug || null
+  );
+  console.log(`Quadrant determination: ${quadrant}, isStable: ${isStable}, isFormularyOptimal: ${isFormularyOptimal}, Tier: ${currentFormularyDrug?.tier}`);
+
+  // Step 2: Get LLM clinical reasoning
+  const triage = await triagePatient(assessment, genericDrugName, currentFormularyDrug || null, quadrant);
   console.log('Triage result:', JSON.stringify(triage));
 
-  // Step 2: Targeted RAG Retrieval
+  // Step 3: Targeted RAG Retrieval
   const evidence = await retrieveRelevantEvidence(genericDrugName, assessment.diagnosis, triage);
   console.log(`Retrieved ${evidence.length} evidence chunks`);
 
@@ -346,7 +382,7 @@ export async function generateLLMRecommendations(
     return costA - costB;
   });
 
-  // Step 3: LLM Recommendations
+  // Step 4: LLM Recommendations
   const llmRecs = await getLLMRecommendationSuggestions(
     assessment,
     genericDrugName,
@@ -357,7 +393,7 @@ export async function generateLLMRecommendations(
     patient.contraindications
   );
 
-  // Step 4: Add cost calculations and format
+  // Step 5: Add cost calculations and format
   const recommendations = llmRecs.map(rec => {
     const targetDrug = rec.drugName
       ? patient.plan!.formularyDrugs.find(d => d.drugName.toLowerCase() === rec.drugName?.toLowerCase())
@@ -383,9 +419,9 @@ export async function generateLLMRecommendations(
   });
 
   return {
-    isStable: triage.canDoseReduce,
-    isFormularyOptimal: !triage.shouldSwitch,
-    quadrant: triage.quadrant,
+    isStable,
+    isFormularyOptimal,
+    quadrant,
     recommendations: recommendations.slice(0, 3),
   };
 }
