@@ -38,3 +38,4 @@ prisma/dev.db-journal
 
 # uploads
 /uploads
+.env

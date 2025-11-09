@@ -3,7 +3,7 @@ import "./globals.css";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Zest Biologic DSS",
+  title: "Zest Fulcrum",
   description: "Dermatology Biologic Decision Support System",
 };
 
@@ -21,7 +21,7 @@ export default function RootLayout({
               <div className="flex justify-between h-16 items-center">
                 <div className="flex items-center space-x-8">
                   <Link href="/" className="text-2xl font-bold text-primary-600">
-                    Zest DSS
+                    Zest Fulcrum
                   </Link>
                   <div className="hidden md:flex space-x-6">
                     <Link href="/patients" className="text-gray-700 hover:text-primary-600">

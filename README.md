@@ -1,5 +1,12 @@
 # Zest Biologic Decision Support System
 
+## To Commit Changes from Codespace
+
+git add "path"
+git commit -m "Whatever you want here for posterity"
+git push
+
+
 ## 🚀 Opening a New Codespace (First Time Setup)
 
 Copy and paste this entire block into your terminal:
