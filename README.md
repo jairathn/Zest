@@ -2,6 +2,16 @@
 
 A simplified MVP for dermatology biologic optimization with cost-saving recommendations.
 
+## 🔄 Update Your Codespace (Run this when Claude pushes changes)
+
+When the codebase is updated, pull the latest changes:
+
+```bash
+git pull && npm install && npx prisma db push
+```
+
+Then restart your dev server (Ctrl+C to stop, then `npm run dev` to restart).
+
 ## Features
 
 - 📊 **CSV Upload System** - Upload formulary data, claims data, and patient eligibility
@@ -36,6 +46,82 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
+
+## Codespace Setup (First-Time Setup)
+
+When opening a new codespace, run these commands in order:
+
+### 1. Switch to Node.js 20
+```bash
+nvm use 20
+```
+
+### 2. Install Dependencies
+```bash
+npm install
+```
+
+### 3. Start and Configure PostgreSQL
+```bash
+# Disable SSL for dev environment
+sudo sed -i "s/ssl = on/ssl = off/" /etc/postgresql/16/main/postgresql.conf
+
+# Configure authentication
+sudo sed -i 's/peer/trust/g' /etc/postgresql/16/main/pg_hba.conf
+
+# Start PostgreSQL (if not already running)
+sudo pg_ctlcluster 16 main start 2>/dev/null || echo "PostgreSQL already running"
+
+# Wait for startup
+sleep 2
+
+# Create database
+sudo -u postgres createdb zest_biologic_dss 2>/dev/null || echo "Database already exists"
+
+# Set postgres user password
+sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'password';"
+
+# Enable password authentication
+sudo sed -i 's/trust/md5/g' /etc/postgresql/16/main/pg_hba.conf
+
+# Restart PostgreSQL to apply changes
+sudo pg_ctlcluster 16 main restart
+```
+
+### 4. Set Up Database Schema
+```bash
+# Push Prisma schema to database
+npx prisma db push
+```
+
+### 5. Start Development Server
+
+**Clean start (kills any stuck ports first - recommended):**
+```bash
+fuser -k 3000/tcp 2>/dev/null; fuser -k 3001/tcp 2>/dev/null; fuser -k 3002/tcp 2>/dev/null; npm run dev
+```
+
+Or just:
+```bash
+npm run dev
+```
+
+**All-in-One Command** (Copy-paste this entire block):
+```bash
+nvm use 20 && \
+npm install && \
+sudo sed -i "s/ssl = on/ssl = off/" /etc/postgresql/16/main/postgresql.conf && \
+sudo sed -i 's/peer/trust/g' /etc/postgresql/16/main/pg_hba.conf && \
+sudo pg_ctlcluster 16 main start 2>/dev/null && \
+sleep 2 && \
+sudo -u postgres createdb zest_biologic_dss 2>/dev/null && \
+sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'password';" && \
+sudo sed -i 's/trust/md5/g' /etc/postgresql/16/main/pg_hba.conf && \
+sudo pg_ctlcluster 16 main restart && \
+sleep 2 && \
+npx prisma db push && \
+npm run dev
+```
 
 ## Architecture
 
