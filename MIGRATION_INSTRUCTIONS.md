@@ -4,9 +4,22 @@
 
 A database migration is required to add the dataset tracking functionality.
 
-### Quick Start
+### Quick Start (For Existing Database)
 
-If your DATABASE_URL environment variable is set, run:
+If you get error **P3005: "The database schema is not empty"**, your database exists but has no migration history. Use this approach:
+
+```bash
+# Run the automated script
+./apply-migration.sh
+
+# OR run commands manually:
+npx prisma db push --skip-generate
+npx prisma migrate resolve --applied 20250109000000_add_dataset_tracking_fields
+```
+
+### Quick Start (For New Database)
+
+If your database is empty:
 
 ```bash
 npx prisma migrate deploy
