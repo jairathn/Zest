@@ -323,9 +323,9 @@ export default async function RecommendationsPage({ params }: PageProps) {
                             </div>
                             {relevance !== null && (
                               <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                                relevance >= 80 ? 'bg-green-100 text-green-800' :
-                                relevance >= 70 ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-800'
+                                relevance >= 80 ? 'bg-primary-100 text-primary-800' :
+                                relevance >= 70 ? 'bg-primary-50 text-primary-700' :
+                                'bg-gray-100 text-gray-600'
                               }`}>
                                 {relevance}% relevant
                               </span>

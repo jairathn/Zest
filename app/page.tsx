@@ -3,16 +3,23 @@ import { ArrowRight, Upload, FileText, TrendingDown } from "lucide-react";
 
 export default function HomePage() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Biologic Decision Support System
-        </h1>
-        <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-          Reduce biologic costs while maintaining clinical outcomes through intelligent,
-          evidence-based therapy optimization
-        </p>
+    <div>
+      {/* Hero Section with Orange Gradient */}
+      <div className="bg-gradient-to-r from-primary-600 to-primary-500 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold mb-4">
+              Biologic Decision Support System
+            </h1>
+            <p className="text-xl text-primary-50 max-w-3xl mx-auto">
+              Reduce biologic costs while maintaining clinical outcomes through intelligent,
+              evidence-based therapy optimization
+            </p>
+          </div>
+        </div>
       </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
       <div className="grid md:grid-cols-3 gap-8 mb-12">
         <div className="card">
@@ -86,6 +93,7 @@ export default function HomePage() {
             </div>
           </li>
         </ol>
+      </div>
       </div>
     </div>
   );
