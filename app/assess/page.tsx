@@ -33,8 +33,19 @@ export default function AssessmentPage() {
   useEffect(() => {
     fetch('/api/patients')
       .then(res => res.json())
-      .then(data => setPatients(data))
-      .catch(console.error);
+      .then(data => {
+        // Ensure data is an array before setting patients
+        if (Array.isArray(data)) {
+          setPatients(data);
+        } else {
+          console.error('Expected array of patients, got:', data);
+          setPatients([]);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to fetch patients:', err);
+        setPatients([]);
+      });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,7 +129,7 @@ export default function AssessmentPage() {
             required
           >
             <option value="">Select a patient</option>
-            {patients.map(p => (
+            {Array.isArray(patients) && patients.map(p => (
               <option key={p.id} value={p.id}>
                 {p.firstName} {p.lastName} {p.externalId ? `(${p.externalId})` : ''}
               </option>
