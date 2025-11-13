@@ -394,8 +394,14 @@ EVIDENCE REQUIREMENTS (RAG):
 Generate AT LEAST 3 specific recommendations ranked by clinical benefit and cost savings. For EACH recommendation:
 1. Type (DOSE_REDUCTION, SWITCH_TO_BIOSIMILAR, SWITCH_TO_PREFERRED, THERAPEUTIC_SWITCH, OPTIMIZE_CURRENT, or CONTINUE_CURRENT)
 2. Specific drug name (MUST be from formulary options above, or current drug for CONTINUE_CURRENT/OPTIMIZE_CURRENT)
-3. New dose (extract from RAG evidence if dose reduction; "Per label" if switching)
-4. New frequency (extract specific interval from RAG evidence if dose reduction; "Per label" if switching)
+3. New dose:
+   - DOSE_REDUCTION: Extract SPECIFIC reduced dose from RAG evidence (e.g., "40 mg")
+   - SWITCHES: Provide FDA-approved SPECIFIC dose (e.g., "80 mg initial, then 40 mg" or "300 mg")
+   - NEVER use generic phrases like "Per label" - always specify the actual dose
+4. New frequency:
+   - DOSE_REDUCTION: Extract SPECIFIC reduced interval from RAG evidence (e.g., "every 4 weeks" instead of "every 2 weeks")
+   - SWITCHES: Provide FDA-approved SPECIFIC frequency (e.g., "every 2 weeks starting 1 week after initial dose")
+   - NEVER use generic phrases like "Per label" - always specify the actual interval
 5. Detailed rationale:
    - DOSE_REDUCTION: MUST cite specific RAG evidence (trials, studies, intervals)
    - SWITCHES (formulary or therapeutic): Provide clear clinical reasoning, NO RAG citations needed
@@ -661,12 +667,28 @@ export async function generateLLMRecommendations(
       ? currentBiologic.drugName  // Brand name: "Amjevita"
       : rec.drugName || genericDrugName;  // For switches, use target drug
 
+    // Get FDA-approved dosing if LLM didn't provide specific dosing or used "Per label"
+    let finalDose = rec.newDose || '';
+    let finalFrequency = rec.newFrequency || '';
+
+    // If LLM returned generic "Per label" or empty, use our reference
+    const needsDosingReference = !finalDose || !finalFrequency ||
+                                  finalDose.toLowerCase().includes('per label') ||
+                                  finalFrequency.toLowerCase().includes('per label');
+
+    if (needsDosingReference && rec.type !== 'DOSE_REDUCTION' && displayDrugName) {
+      // For switches, use FDA-approved dosing reference
+      const standardDosing = getSpecificDrugDosing(displayDrugName);
+      finalDose = standardDosing.dose;
+      finalFrequency = standardDosing.frequency;
+    }
+
     return {
       rank: rec.rank,
       type: rec.type,
       drugName: displayDrugName,
-      newDose: rec.newDose,
-      newFrequency: rec.newFrequency,
+      newDose: finalDose,
+      newFrequency: finalFrequency,
       ...costData,
       rationale: rec.rationale,
       evidenceSources: drugSpecificEvidence, // Show all dynamically retrieved evidence
@@ -705,7 +727,135 @@ export async function generateLLMRecommendations(
 }
 
 /**
- * Helper: Get standard dosing for drug classes
+ * Helper: Get standard FDA-approved dosing for specific biologics
+ */
+function getSpecificDrugDosing(drugName: string): { dose: string; frequency: string } {
+  const normalizedName = drugName.toLowerCase();
+
+  // TNF Inhibitors (Adalimumab biosimilars and originator)
+  if (normalizedName.includes('humira') || normalizedName.includes('adalimumab') ||
+      normalizedName.includes('amjevita') || normalizedName.includes('hyrimoz') ||
+      normalizedName.includes('cyltezo') || normalizedName.includes('hadlima') ||
+      normalizedName.includes('abrilada') || normalizedName.includes('yusimry')) {
+    return {
+      dose: '80 mg initial dose, then 40 mg',
+      frequency: 'every 2 weeks starting 1 week after initial dose'
+    };
+  }
+
+  if (normalizedName.includes('enbrel') || normalizedName.includes('etanercept')) {
+    return {
+      dose: '50 mg',
+      frequency: 'twice weekly for 3 months, then once weekly (or 50 mg twice weekly may continue)'
+    };
+  }
+
+  if (normalizedName.includes('cimzia') || normalizedName.includes('certolizumab')) {
+    return {
+      dose: '400 mg (given as two 200 mg injections)',
+      frequency: 'every 2 weeks, or 400 mg at weeks 0, 2, 4, then every 4 weeks'
+    };
+  }
+
+  // IL-17 Inhibitors
+  if (normalizedName.includes('cosentyx') || normalizedName.includes('secukinumab')) {
+    return {
+      dose: '300 mg',
+      frequency: 'at weeks 0, 1, 2, 3, 4, then every 4 weeks'
+    };
+  }
+
+  if (normalizedName.includes('taltz') || normalizedName.includes('ixekizumab')) {
+    return {
+      dose: '160 mg initial dose (two 80 mg injections), then 80 mg',
+      frequency: 'every 2 weeks for weeks 2, 4, 6, 8, 10, 12, then every 4 weeks'
+    };
+  }
+
+  if (normalizedName.includes('siliq') || normalizedName.includes('brodalumab')) {
+    return {
+      dose: '210 mg',
+      frequency: 'at weeks 0, 1, 2, then every 2 weeks'
+    };
+  }
+
+  // IL-23 Inhibitors
+  if (normalizedName.includes('tremfya') || normalizedName.includes('guselkumab')) {
+    return {
+      dose: '100 mg',
+      frequency: 'at weeks 0, 4, then every 8 weeks'
+    };
+  }
+
+  if (normalizedName.includes('skyrizi') || normalizedName.includes('risankizumab')) {
+    return {
+      dose: '150 mg (two 75 mg injections)',
+      frequency: 'at weeks 0, 4, then every 12 weeks'
+    };
+  }
+
+  if (normalizedName.includes('ilumya') || normalizedName.includes('tildrakizumab')) {
+    return {
+      dose: '100 mg',
+      frequency: 'at weeks 0, 4, then every 12 weeks'
+    };
+  }
+
+  // IL-12/23 Inhibitor
+  if (normalizedName.includes('stelara') || normalizedName.includes('ustekinumab')) {
+    return {
+      dose: '45 mg (for patients ≤100 kg) or 90 mg (for patients >100 kg)',
+      frequency: 'at weeks 0, 4, then every 12 weeks'
+    };
+  }
+
+  // IL-4/13 Inhibitor (Atopic Dermatitis)
+  if (normalizedName.includes('dupixent') || normalizedName.includes('dupilumab')) {
+    return {
+      dose: '600 mg loading dose (two 300 mg injections), then 300 mg',
+      frequency: 'every 2 weeks'
+    };
+  }
+
+  // JAK Inhibitors
+  if (normalizedName.includes('rinvoq') || normalizedName.includes('upadacitinib')) {
+    return {
+      dose: '15 mg orally once daily',
+      frequency: 'daily (may increase to 30 mg for inadequate response)'
+    };
+  }
+
+  if (normalizedName.includes('cibinqo') || normalizedName.includes('abrocitinib')) {
+    return {
+      dose: '100 mg orally once daily',
+      frequency: 'daily (may adjust to 200 mg or 50 mg based on response)'
+    };
+  }
+
+  if (normalizedName.includes('sotyktu') || normalizedName.includes('deucravacitinib')) {
+    return {
+      dose: '6 mg orally once daily',
+      frequency: 'daily'
+    };
+  }
+
+  // IL-13 Inhibitor
+  if (normalizedName.includes('adbry') || normalizedName.includes('tralokinumab')) {
+    return {
+      dose: '600 mg loading dose (four 150 mg injections), then 300 mg',
+      frequency: 'every 2 weeks (may extend to every 4 weeks after 16 weeks if clear/almost clear)'
+    };
+  }
+
+  // Default fallback
+  return {
+    dose: 'Per FDA label',
+    frequency: 'Per FDA label'
+  };
+}
+
+/**
+ * Helper: Get standard dosing for drug classes (deprecated, use getSpecificDrugDosing)
  */
 function getDrugStandardDosing(drugClass: string): string {
   const dosingMap: Record<string, string> = {
