@@ -45,7 +45,7 @@ enum RecommendationType {
   SWITCH_TO_PREFERRED
   OPTIMIZE_CURRENT
   THERAPEUTIC_SWITCH
-  CONTINUE
+  CONTINUE_CURRENT
 }
 
 enum DecisionStatus {

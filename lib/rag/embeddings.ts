@@ -32,17 +32,62 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
 /**
  * Chunk text into smaller pieces for better retrieval
+ * Uses semantic boundaries (paragraphs/sentences) for more coherent chunks
  */
-export function chunkText(text: string, chunkSize: number = 500, overlap: number = 50): string[] {
-  const words = text.split(/\s+/);
-  const chunks: string[] = [];
+export function chunkText(text: string, targetChunkSize: number = 400, overlap: number = 50): string[] {
+  // Clean the text: remove common PDF artifacts
+  let cleanText = text
+    .replace(/\f/g, '\n\n') // Form feed to paragraph breaks
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .replace(/(\w+)-\s+(\w+)/g, '$1$2') // Fix hyphenated words split across lines
+    .trim();
 
-  for (let i = 0; i < words.length; i += chunkSize - overlap) {
-    const chunk = words.slice(i, i + chunkSize).join(' ');
-    chunks.push(chunk);
+  // Split into paragraphs first (preserves semantic units)
+  const paragraphs = cleanText.split(/\n\n+/).filter(p => p.trim().length > 0);
+  const chunks: string[] = [];
+  let currentChunk = '';
+
+  for (const paragraph of paragraphs) {
+    const words = paragraph.split(/\s+/);
+
+    // If adding this paragraph keeps us under target size, add it
+    if ((currentChunk.split(/\s+/).length + words.length) <= targetChunkSize) {
+      currentChunk += (currentChunk ? ' ' : '') + paragraph;
+    } else {
+      // Save current chunk if it has content
+      if (currentChunk) {
+        chunks.push(currentChunk);
+      }
+
+      // Start new chunk with this paragraph
+      // If paragraph itself is too long, split it by sentences
+      if (words.length > targetChunkSize) {
+        const sentences = paragraph.split(/[.!?]+\s+/);
+        let sentenceChunk = '';
+
+        for (const sentence of sentences) {
+          const sentenceWords = sentence.split(/\s+/);
+          if ((sentenceChunk.split(/\s+/).length + sentenceWords.length) <= targetChunkSize) {
+            sentenceChunk += (sentenceChunk ? '. ' : '') + sentence;
+          } else {
+            if (sentenceChunk) chunks.push(sentenceChunk);
+            sentenceChunk = sentence;
+          }
+        }
+
+        currentChunk = sentenceChunk;
+      } else {
+        currentChunk = paragraph;
+      }
+    }
   }
 
-  return chunks;
+  // Add final chunk
+  if (currentChunk) {
+    chunks.push(currentChunk);
+  }
+
+  return chunks.filter(c => c.length > 50); // Filter out tiny chunks
 }
 
 /**

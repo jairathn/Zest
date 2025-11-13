@@ -37,6 +37,7 @@ interface TriageResult {
   canDoseReduce: boolean;
   shouldSwitch: boolean;
   needsInitiation: boolean;
+  shouldContinueCurrent: boolean;
   quadrant: string;
   reasoning: string;
 }
@@ -49,6 +50,14 @@ interface LLMRecommendation {
   rationale: string;
   monitoringPlan?: string;
   rank: number;
+}
+
+/**
+ * Check if patient is stable but for insufficient duration
+ * These patients should continue current therapy, not optimize yet
+ */
+function isStableShortDuration(dlqiScore: number, monthsStable: number): boolean {
+  return dlqiScore <= 1 && monthsStable < 6;
 }
 
 /**
@@ -69,8 +78,20 @@ function determineQuadrantAndStatus(
     };
   }
 
-  // Stability: DLQI ≤5 and ≥6 months stable
-  const isStable = dlqiScore <= 5 && monthsStable >= 6;
+  // Check for stable but insufficient duration - special case
+  if (isStableShortDuration(dlqiScore, monthsStable)) {
+    const isFormularyOptimal = currentFormularyDrug
+      ? (currentFormularyDrug.tier === 1 && !currentFormularyDrug.requiresPA)
+      : false;
+    return {
+      isStable: true, // Patient IS stable, just not for long enough
+      isFormularyOptimal,
+      quadrant: 'stable_short_duration'
+    };
+  }
+
+  // Stability: DLQI ≤1 (no effect on life) and ≥6 months stable
+  const isStable = dlqiScore <= 1 && monthsStable >= 6;
 
   // Formulary optimal: ONLY Tier 1 without PA
   // Tier 2-3 = suboptimal even if "aligned"
@@ -119,24 +140,27 @@ Formulary Status:
 
 The patient has been classified as: ${quadrant}
 - not_on_biologic: Patient needs biologic initiation → Recommend best Tier 1 option
-- stable_optimal: Stable + Tier 1 without PA → Consider dose reduction OR within-tier optimization OR continue if fully optimized
-- stable_suboptimal: Stable + Tier 2-3 → ⚠️ MUST recommend switch to Tier 1 (NEVER just continue or optimize current)
+- stable_short_duration: Patient is stable (DLQI ≤1) but for <6 months → Continue current therapy, re-evaluate after sufficient time
+- stable_optimal: Stable + Tier 1 without PA → Consider dose reduction OR within-tier optimization
+- stable_suboptimal: Stable + Tier 2-3 → MUST recommend switch to Tier 1
 - unstable_optimal: Unstable + Tier 1 → Consider different Tier 1 option or optimize current
 - unstable_suboptimal: Unstable + Tier 2-3 → ⚠️ MUST recommend switch to Tier 1 (NEVER just continue or optimize current)
 
 CRITICAL: Tier 2 and Tier 3 indicate room for optimization. These patients should ALWAYS get switch recommendations to Tier 1.
 
 Based on the quadrant "${quadrant}", determine:
-1. Should dose reduction be considered? (Only for stable_optimal AND currently Tier 1)
-2. Should formulary switch be recommended? (YES for any "suboptimal" OR "not_on_biologic" - Tier 2-3 MUST switch)
+1. Should dose reduction be considered? (Only for stable_optimal AND currently Tier 1, NOT for stable_short_duration)
+2. Should formulary switch be recommended? (YES for any "suboptimal" OR "not_on_biologic", NOT for stable_short_duration)
 3. Should recommend biologic initiation? (YES for "not_on_biologic")
-4. Provide clinical reasoning
+4. Should continue current therapy? (YES for stable_short_duration)
+5. Provide clinical reasoning
 
 Return ONLY a JSON object with this exact structure:
 {
   "canDoseReduce": boolean,
   "shouldSwitch": boolean,
   "needsInitiation": boolean,
+  "shouldContinueCurrent": boolean,
   "quadrant": "${quadrant}",
   "reasoning": "string"
 }`;
@@ -168,6 +192,11 @@ async function retrieveRelevantEvidence(
     queries.push(`${diagnosis} biologic efficacy comparison first-line therapy`);
     queries.push(`${diagnosis} treatment guidelines biologic selection`);
     queries.push(`${diagnosis} biologic initiation best outcomes`);
+  }
+  // Continue current - minimal evidence needed, just dose reduction possibilities for future
+  else if (triage.shouldContinueCurrent && drugName) {
+    queries.push(`${drugName} dose reduction interval extension ${diagnosis} stable patients`);
+    // Limited evidence retrieval - just for future reference
   }
   // Switch evidence for suboptimal patients
   else if (triage.shouldSwitch && drugName) {
@@ -317,44 +346,59 @@ CLINICAL DECISION-MAKING GUIDELINES:
    - Lowest cost within Tier 1
    - Generate 2-3 Tier 1 options if available
 
-2. **stable_optimal** (Tier 1, stable):
-   - Primary: Consider dose reduction (cite RAG for intervals)
-   - Secondary: Compare to other Tier 1 options if significant cost difference exists
-   - Tertiary: OPTIMIZE_CURRENT if already dose-reduced, OR CONTINUE if fully optimized
-   - Try to generate 3 recommendations
+2. **stable_short_duration** (DLQI ≤1 but <6 months stable):
+   - PRIMARY: CONTINUE_CURRENT - patient has excellent control but insufficient duration
+   - Calculate months needed to reach 6 months total: ${6 - assessment.monthsStable} more months
+   - OPTION 2 & 3: Mention future options to consider once 6 months stability is achieved (formulary switches or dose reduction as appropriate)
+   - Rationale: Premature optimization risks disrupting newly achieved stability
 
-3. **stable_suboptimal** (Tier 2-3, stable):
-   - ⚠️ CRITICAL: MUST generate SWITCH recommendations to Tier 1 - NEVER just OPTIMIZE_CURRENT or CONTINUE
-   - Generate 3 different Tier 1 switch options if available
-   - Compare efficacy within same class first (e.g., IL-23 to IL-23)
-   - Consider cross-class if better efficacy (e.g., TNF to IL-17/IL-23)
-   - Only use CONTINUE if literally no Tier 1 options exist (extremely rare)
+3. **stable_optimal** (Tier 1, stable ≥6 months):
+   - PRIMARY: Dose reduction (cite RAG evidence for safety/efficacy of extended intervals)
+   - ALTERNATIVE: Switch to different Tier 1 ONLY if biosimilar or significantly lower cost
 
-4. **unstable_optimal** (Tier 1, unstable):
-   - Primary: OPTIMIZE_CURRENT (check adherence, dosing)
-   - Secondary: Switch to different Tier 1 with better efficacy
-   - Tertiary: Consider different mechanism of action within Tier 1
-   - Try to generate 3 recommendations
+4. **stable_suboptimal** - TIER-SPECIFIC STRATEGY:
 
-5. **unstable_suboptimal** (Tier 2-3, unstable):
-   - ⚠️ CRITICAL: MUST generate SWITCH recommendations to Tier 1 - NEVER just OPTIMIZE_CURRENT or CONTINUE
-   - Generate 3 different Tier 1 switch options prioritizing efficacy
-   - Switch to best Tier 1 option for efficacy
-   - Consider different drug classes for better outcomes
+   a. **Tier 2 (stable)** - Two options, ranked by cost savings:
+      - OPTION 1 (Preferred): Switch to Tier 1 biosimilar or same-class drug
+      - OPTION 2 (Alternative): Dose reduction of current Tier 2 drug (cite RAG evidence)
+      - Rank by total cost optimization potential
+      - No RAG needed for switch rationale (formulary alignment is self-evident)
+
+   b. **Tier 3 (stable)** - Switch ONLY (NEVER dose reduce):
+      - MUST switch to Tier 1 or Tier 2 (prefer Tier 1)
+      - Prioritize biosimilars of same drug if available
+      - Then same-class drugs
+      - Then cross-class if better efficacy
+      - No RAG needed for switch rationale (cost optimization is obvious)
+
+5. **unstable_optimal** (Tier 1, unstable):
+   - Switch to different Tier 1 with superior efficacy (cite evidence)
+   - Prefer different mechanism of action (e.g., if TNF failed, try IL-17 or IL-23)
+   - Target drugs with proven higher efficacy for ${assessment.diagnosis}
+
+6. **unstable_suboptimal** (Tier 2-3, unstable):
+   - Switch to Tier 1 drug with best efficacy for ${assessment.diagnosis} (cite evidence)
+   - Prefer different mechanism if current class failing
+   - If Tier 3 and same class as better Tier 1/2 option, recommend that
 
 PRIORITIZATION:
 - Always prefer Tier 1 > Tier 2 > Tier 3
 - Within same tier: Higher efficacy > Lower cost
-- Use RAG evidence to support efficacy claims
 - For ${assessment.diagnosis}, consider drug class preferences from guidelines
 
-Generate 3 specific recommendations ranked by clinical benefit and cost savings (or fewer ONLY if you cannot generate 3). For EACH recommendation:
-1. Type: DOSE_REDUCTION, SWITCH_TO_BIOSIMILAR, SWITCH_TO_PREFERRED, THERAPEUTIC_SWITCH, OPTIMIZE_CURRENT, or CONTINUE
-   - Use CONTINUE ONLY if already fully optimized (Tier 1, stable, dose-reduced) OR cannot generate other options
-2. Specific drug name (MUST be from formulary options above; null for CONTINUE)
-3. New dose (extract from RAG evidence if dose reduction; "Per label" if switching; null for CONTINUE)
-4. New frequency (extract specific interval from RAG evidence if dose reduction; "Per label" if switching; null for CONTINUE)
-5. Detailed rationale citing RAG evidence, efficacy data, and cost benefit
+EVIDENCE REQUIREMENTS (RAG):
+- **DOSE REDUCTION ONLY**: Cite RAG evidence (clinically controversial, needs literature support)
+- **FORMULARY SWITCHES**: NO RAG - cost optimization is self-evident business case
+- **THERAPEUTIC SWITCHES** (unstable escalation): NO RAG - standard clinical practice, provide rationale but no citations needed
+
+Generate AT LEAST 3 specific recommendations ranked by clinical benefit and cost savings. For EACH recommendation:
+1. Type (DOSE_REDUCTION, SWITCH_TO_BIOSIMILAR, SWITCH_TO_PREFERRED, THERAPEUTIC_SWITCH, OPTIMIZE_CURRENT, or CONTINUE_CURRENT)
+2. Specific drug name (MUST be from formulary options above, or current drug for CONTINUE_CURRENT/OPTIMIZE_CURRENT)
+3. New dose (extract from RAG evidence if dose reduction; "Per label" if switching)
+4. New frequency (extract specific interval from RAG evidence if dose reduction; "Per label" if switching)
+5. Detailed rationale:
+   - DOSE_REDUCTION: MUST cite specific RAG evidence (trials, studies, intervals)
+   - SWITCHES (formulary or therapeutic): Provide clear clinical reasoning, NO RAG citations needed
 6. Monitoring plan
 
 Return ONLY a JSON object with this exact structure:
@@ -595,9 +639,20 @@ export async function generateLLMRecommendations(
       );
 
       // Flatten and format evidence with similarity scores for transparency
+      // Filter out metadata patterns and show longer excerpts (800 chars) for better context
       drugSpecificEvidence = evidenceResults
         .flat()
-        .map(e => `${e.title} (relevance: ${(e.similarity * 100).toFixed(0)}%): ${e.content.substring(0, 500)}...`);
+        .map(e => {
+          // Clean content: remove common PDF metadata patterns
+          let cleanContent = e.content
+            .replace(/^.*?(Abstract|ABSTRACT|Background\/objectives?|Introduction|INTRODUCTION):/i, '$1:')
+            .replace(/^\s*[A-Z][a-z]+\s+[A-Z][a-z]+,?\s+[A-Z]\..*?\n/gm, '') // Author names
+            .replace(/^\s*\d+\s*$/gm, '') // Page numbers alone on a line
+            .replace(/doi:\s*\S+/gi, '') // DOI references
+            .trim();
+
+          return `${e.title} (relevance: ${(e.similarity * 100).toFixed(0)}%): ${cleanContent.substring(0, 800)}...`;
+        });
     }
 
     // For dose reduction, display the BRAND name (Amjevita) not generic (adalimumab)
@@ -616,8 +671,14 @@ export async function generateLLMRecommendations(
       rationale: rec.rationale,
       evidenceSources: drugSpecificEvidence, // Show all dynamically retrieved evidence
       monitoringPlan: rec.monitoringPlan,
-      tier: targetDrug?.tier || currentFormularyDrug?.tier,
-      requiresPA: targetDrug?.requiresPA || currentFormularyDrug?.requiresPA,
+      // For DOSE_REDUCTION, use current drug's tier (no target drug, staying on same medication)
+      // For switches, use target drug's tier
+      tier: rec.type === 'DOSE_REDUCTION'
+        ? currentFormularyDrug?.tier
+        : (targetDrug?.tier || currentFormularyDrug?.tier),
+      requiresPA: rec.type === 'DOSE_REDUCTION'
+        ? currentFormularyDrug?.requiresPA
+        : (targetDrug?.requiresPA || currentFormularyDrug?.requiresPA),
       contraindicated: false, // LLM should handle contraindications in rationale
       contraindicationReason: undefined,
     };
