@@ -211,12 +211,8 @@ export async function generateRecommendations(
   const isFormularyOptimal = determineFormularyStatus(currentFormularyDrug || null);
   const quadrant = getQuadrant(isStable, isFormularyOptimal);
 
-  // Search knowledge base for relevant evidence using dynamic similarity threshold
-  const knowledgeQuery = `${assessment.diagnosis} ${currentBiologic.drugName} ${quadrant}`;
-  const evidence = await searchKnowledge(knowledgeQuery, {
-    minSimilarity: 0.65,
-    maxResults: 10
-  });
+  // NOTE: RAG evidence retrieval happens ONLY for dose reduction recommendations
+  // Switches (formulary or therapeutic) don't need RAG - business case or standard practice
 
   // Generate recommendations based on quadrant
   const recommendations: RecommendationOutput[] = [];
@@ -338,7 +334,7 @@ export async function generateRecommendations(
       contraindicated: false,
     });
   } else if (quadrant === 'unstable_formulary_aligned') {
-    // Optimize current therapy
+    // Optimize current therapy - standard clinical practice, no RAG needed
     recommendations.push({
       rank: 1,
       type: 'OPTIMIZE_CURRENT',
@@ -347,7 +343,7 @@ export async function generateRecommendations(
       newFrequency: currentBiologic.frequency,
       currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
       rationale: `Disease is not adequately controlled (DLQI ${assessment.dlqiScore}). Focus on adherence optimization and ensure proper dosing before considering therapy change.`,
-      evidenceSources: evidence.map(e => e.title),
+      evidenceSources: [], // No RAG needed - standard clinical practice
       monitoringPlan: 'Reassess adherence barriers. Consider patient education, auto-injector training. Re-evaluate in 12 weeks.',
       tier: currentFormularyDrug?.tier,
       requiresPA: currentFormularyDrug?.requiresPA,
@@ -383,7 +379,7 @@ export async function generateRecommendations(
         currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
         recommendedMonthlyOOP: alt.memberCopayT1?.div(12).toNumber(),
         rationale: `Disease inadequately controlled on current non-preferred agent. Switch to formulary-preferred ${alt.drugClass.replace('_', ' ')} may improve outcomes and reduce costs.`,
-        evidenceSources: evidence.map(e => e.title),
+        evidenceSources: [], // No RAG needed - therapeutic escalation is standard clinical practice
         monitoringPlan: 'Baseline labs if indicated. Assess response at 12-16 weeks based on drug pharmacokinetics.',
         tier: alt.tier,
         requiresPA: alt.requiresPA,

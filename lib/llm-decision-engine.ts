@@ -339,16 +339,18 @@ PRIORITIZATION:
 - For ${assessment.diagnosis}, consider drug class preferences from guidelines
 
 EVIDENCE REQUIREMENTS (RAG):
-- **DOSE REDUCTION**: ALWAYS cite RAG evidence (clinically controversial)
-- **FORMULARY SWITCHES** (Tier 3→1, Tier 2→1): NO RAG needed (cost optimization is self-evident business case)
-- **THERAPEUTIC SWITCHES** (unstable, changing mechanism): CITE RAG evidence for efficacy claims
+- **DOSE REDUCTION ONLY**: Cite RAG evidence (clinically controversial, needs literature support)
+- **FORMULARY SWITCHES**: NO RAG - cost optimization is self-evident business case
+- **THERAPEUTIC SWITCHES** (unstable escalation): NO RAG - standard clinical practice, provide rationale but no citations needed
 
 Generate 1-3 specific recommendations ranked by clinical benefit and cost savings. For EACH recommendation:
 1. Type (DOSE_REDUCTION, SWITCH_TO_BIOSIMILAR, SWITCH_TO_PREFERRED, THERAPEUTIC_SWITCH, or OPTIMIZE_CURRENT)
 2. Specific drug name (MUST be from formulary options above)
 3. New dose (extract from RAG evidence if dose reduction; "Per label" if switching)
 4. New frequency (extract specific interval from RAG evidence if dose reduction; "Per label" if switching)
-5. Detailed rationale citing RAG evidence, efficacy data, and cost benefit
+5. Detailed rationale:
+   - DOSE_REDUCTION: MUST cite specific RAG evidence (trials, studies, intervals)
+   - SWITCHES (formulary or therapeutic): Provide clear clinical reasoning, NO RAG citations needed
 6. Monitoring plan
 
 Return ONLY a JSON object with this exact structure:
