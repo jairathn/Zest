@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Save } from 'lucide-react';
 import Link from 'next/link';
+import BiologicInput from '@/components/BiologicInput';
 
 interface Patient {
   id: string;
@@ -217,38 +218,19 @@ export default function EditPatientPage({ params }: PageProps) {
         {/* Current Biologic */}
         <div>
           <h3 className="text-lg font-semibold mb-3">Current Biologic</h3>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="md:col-span-1">
-              <label className="label">Drug Name</label>
-              <input
-                type="text"
-                className="input w-full"
-                value={formData.currentBiologic}
-                onChange={(e) => setFormData({ ...formData, currentBiologic: e.target.value })}
-                placeholder="e.g., Humira"
-              />
-            </div>
-            <div>
-              <label className="label">Dose</label>
-              <input
-                type="text"
-                className="input w-full"
-                value={formData.dose}
-                onChange={(e) => setFormData({ ...formData, dose: e.target.value })}
-                placeholder="e.g., 40mg"
-              />
-            </div>
-            <div>
-              <label className="label">Frequency</label>
-              <input
-                type="text"
-                className="input w-full"
-                value={formData.frequency}
-                onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
-                placeholder="e.g., Q2W"
-              />
-            </div>
-          </div>
+          <BiologicInput
+            value={{
+              drugName: formData.currentBiologic,
+              dose: formData.dose,
+              frequency: formData.frequency,
+            }}
+            onChange={(value) => setFormData({
+              ...formData,
+              currentBiologic: value.drugName,
+              dose: value.dose,
+              frequency: value.frequency,
+            })}
+          />
         </div>
 
         {/* Contraindications */}

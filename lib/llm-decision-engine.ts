@@ -490,7 +490,13 @@ export async function generateLLMRecommendations(
     : [];
 
   // Add formularyDrugs to patient.plan for compatibility with existing code
-  patient.plan.formularyDrugs = formularyDrugs;
+  const patientWithFormulary = {
+    ...patient,
+    plan: {
+      ...patient.plan,
+      formularyDrugs,
+    },
+  };
 
   const currentBiologic = patient.currentBiologics[0];
   const hasCurrentBiologic = !!currentBiologic;
@@ -502,7 +508,7 @@ export async function generateLLMRecommendations(
 
   // Find current drug in formulary (match by brand name OR generic name)
   const currentFormularyDrug = currentBiologic
-    ? patient.plan.formularyDrugs.find(drug => {
+    ? patientWithFormulary.plan.formularyDrugs.find(drug => {
         const brandMatch = drug.drugName.toLowerCase() === currentBiologic.drugName.toLowerCase();
         const genericMatch = genericDrugName && (
           drug.genericName.toLowerCase() === genericDrugName.toLowerCase() ||
@@ -532,9 +538,9 @@ export async function generateLLMRecommendations(
   console.log(`Retrieved ${evidence.length} evidence chunks for LLM context`);
 
   // Step 4: Filter drugs by diagnosis, then by contraindications
-  const diagnosisAppropriateDrugs = filterByDiagnosis(patient.plan.formularyDrugs, assessment.diagnosis);
+  const diagnosisAppropriateDrugs = filterByDiagnosis(patientWithFormulary.plan.formularyDrugs, assessment.diagnosis);
   const safeFormularyDrugs = filterContraindicated(diagnosisAppropriateDrugs, patient.contraindications);
-  console.log(`Filtered formulary: ${patient.plan.formularyDrugs.length} total → ${diagnosisAppropriateDrugs.length} for ${assessment.diagnosis} → ${safeFormularyDrugs.length} safe`);
+  console.log(`Filtered formulary: ${patientWithFormulary.plan.formularyDrugs.length} total → ${diagnosisAppropriateDrugs.length} for ${assessment.diagnosis} → ${safeFormularyDrugs.length} safe`);
 
   // Sort safe formulary drugs to prioritize lower tiers
   const sortedFormularyDrugs = [...safeFormularyDrugs].sort((a, b) => {
@@ -564,7 +570,7 @@ export async function generateLLMRecommendations(
   // Formulary switches don't need RAG - they're straightforward cost optimizations
   const recommendations = await Promise.all(llmRecs.map(async rec => {
     const targetDrug = rec.drugName
-      ? patient.plan!.formularyDrugs.find(d => d.drugName.toLowerCase() === rec.drugName?.toLowerCase()) ?? null
+      ? patientWithFormulary.plan.formularyDrugs.find(d => d.drugName.toLowerCase() === rec.drugName?.toLowerCase()) ?? null
       : null;
 
     const costData = calculateCostSavings(rec, currentFormularyDrug, targetDrug);

@@ -333,7 +333,7 @@ export default async function RecommendationsPage({ params }: PageProps) {
                           </div>
                           {excerpt && (
                             <p className="text-xs text-gray-600 italic">
-                              "{excerpt}"
+                              &quot;{excerpt}&quot;
                             </p>
                           )}
                         </div>
