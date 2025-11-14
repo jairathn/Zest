@@ -688,20 +688,53 @@ export async function generateLLMRecommendations(
       );
 
       // Flatten and format evidence with similarity scores for transparency
-      // Filter out metadata patterns and show longer excerpts (800 chars) for better context
+      // IMPORTANT: Current chunks have quality issues (truncated sentences, metadata, references)
+      // This cleaning is a band-aid - PDFs should be re-parsed with semantic chunking for production
       drugSpecificEvidence = evidenceResults
         .flat()
+        .filter(e => {
+          // Filter out bibliography/reference entries (contain common reference patterns)
+          const content = e.content.toLowerCase();
+          if (content.includes('et al.') && content.match(/\d{4}/g)?.length > 3) return false; // Multiple years = likely references
+          if (content.match(/doi:|https?:\/\/|pmid:/gi)) return false; // DOIs, URLs, PMIDs
+          if (content.match(/\d+\(\d+\):\d+-\d+/)) return false; // Journal citation format like "2016;96(2):251–252"
+          return true;
+        })
         .map(e => {
           // Clean content: remove common PDF metadata patterns
           let cleanContent = e.content
-            .replace(/^.*?(Abstract|ABSTRACT|Background\/objectives?|Introduction|INTRODUCTION):/i, '$1:')
-            .replace(/^\s*[A-Z][a-z]+\s+[A-Z][a-z]+,?\s+[A-Z]\..*?\n/gm, '') // Author names
-            .replace(/^\s*\d+\s*$/gm, '') // Page numbers alone on a line
-            .replace(/doi:\s*\S+/gi, '') // DOI references
+            // Remove everything before Abstract/Background/Introduction
+            .replace(/^.*?(Abstract|ABSTRACT|Background\/objectives?|Introduction|INTRODUCTION|Results?|RESULTS?):/i, '$1:')
+            // Remove institutional affiliations
+            .replace(/[a-z]\s+[A-Z][a-z]+\s+(University|Medical Center|Institute|Department|Hospital)[^.;]*[.;]/g, '')
+            // Remove author names (multiple patterns)
+            .replace(/^\s*[A-Z][a-z]+\s+[A-Z][a-z]+,?\s+[A-Z]\..*?\n/gm, '') // Smith J.
+            .replace(/^\s*[A-Z][a-z]+,\s*[A-Z]\.,?\s+[A-Z][a-z]+,\s*[A-Z]\./gm, '') // Smith, J., Jones, K.
+            // Remove email addresses
+            .replace(/[\w.-]+@[\w.-]+\.\w+/g, '')
+            // Remove page numbers alone on a line
+            .replace(/^\s*\d+\s*$/gm, '')
+            // Remove journal/copyright notices
+            .replace(/©.*?(?:Taylor|Francis|Wiley|Elsevier|Springer)[^.]*\./gi, '')
+            .replace(/Published online:.*?\d{4}/gi, '')
+            .replace(/View (supplementary material|related articles|citing articles)/gi, '')
+            // Remove DOI references
+            .replace(/doi:\s*\S+/gi, '')
+            .replace(/https?:\/\/\S+/g, '')
+            // Remove common acknowledgment patterns
+            .replace(/Acknowledgements?:.*?(?=\n\n|\n[A-Z]|$)/gi, '')
+            .replace(/Disclosure statement.*?(?=\n\n|\n[A-Z]|$)/gi, '')
+            .replace(/Funding:.*?(?=\n\n|\n[A-Z]|$)/gi, '')
+            // Clean up multiple spaces/newlines
+            .replace(/\s+/g, ' ')
             .trim();
 
-          return `${e.title} (relevance: ${(e.similarity * 100).toFixed(0)}%): ${cleanContent.substring(0, 800)}...`;
-        });
+          // Only include chunks with substantial clinical content (not just metadata)
+          if (cleanContent.length < 100) return null;
+
+          return `${e.title} (relevance: ${(e.similarity * 100).toFixed(0)}%): ${cleanContent.substring(0, 600)}...`;
+        })
+        .filter(Boolean); // Remove nulls
     }
 
     // For dose reduction, display the BRAND name (Amjevita) not generic (adalimumab)
