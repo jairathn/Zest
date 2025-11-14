@@ -292,9 +292,23 @@ async function getLLMRecommendationSuggestions(
     ? contraindications.map(c => c.type).join(', ')
     : 'None';
 
+  // Get current brand name (not generic) to properly exclude from switch options
+  const currentBrandName = currentFormularyDrug?.drugName || currentDrug;
+
   // Show top 10 formulary options, prioritizing lower tiers
+  // CRITICAL: Exclude the current brand drug (not just generic) to avoid recommending "switch to same drug"
   const formularyText = formularyOptions
-    .filter(d => !currentDrug || d.drugName.toLowerCase() !== currentDrug.toLowerCase()) // Exclude current drug if exists
+    .filter(d => {
+      // Exclude current brand drug
+      if (currentBrandName && d.drugName.toLowerCase() === currentBrandName.toLowerCase()) {
+        return false;
+      }
+      // Exclude by generic name match too (belt and suspenders)
+      if (currentDrug && d.drugName.toLowerCase() === currentDrug.toLowerCase()) {
+        return false;
+      }
+      return true;
+    })
     .slice(0, 10)
     .map(d => `${d.drugName} (${d.drugClass}, Tier ${d.tier}, PA: ${d.requiresPA ? 'Yes' : 'No'}, Annual Cost: $${d.annualCostWAC})`)
     .join('\n');
@@ -306,7 +320,7 @@ async function getLLMRecommendationSuggestions(
   const prompt = `You are a clinical decision support AI for dermatology biologic optimization.
 
 Patient Information:
-- Current medication: ${currentDrug || 'None (not on biologic)'}
+- Current medication: ${currentBrandName || 'None (not on biologic)'}${currentDrug && currentDrug !== currentBrandName ? ` (generic: ${currentDrug})` : ''}
 - Diagnosis: ${assessment.diagnosis}
 - DLQI Score: ${assessment.dlqiScore}
 - Months stable: ${assessment.monthsStable}
@@ -354,7 +368,11 @@ CLINICAL DECISION-MAKING GUIDELINES:
 
 3. **stable_optimal** (Tier 1, stable ≥6 months):
    - PRIMARY: Dose reduction (cite RAG evidence for safety/efficacy of extended intervals)
-   - ALTERNATIVE: Switch to different Tier 1 ONLY if biosimilar or significantly lower cost
+   - ALTERNATIVE OPTIONS (if needed to reach 3 total recommendations):
+     * CONTINUE_CURRENT at standard dose (if patient declines dose reduction)
+     * Switch to DIFFERENT Tier 1 drug ONLY if it's a biosimilar with significantly lower cost
+   - ⚠️ NEVER recommend "switching" to the current drug - that's a continuation, not a switch
+   - The current drug has been EXCLUDED from the formulary options list below
 
 4. **stable_suboptimal** - TIER-SPECIFIC STRATEGY:
 
