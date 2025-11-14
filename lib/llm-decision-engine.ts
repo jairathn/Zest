@@ -178,9 +178,67 @@ Return ONLY a JSON object with this exact structure:
 }
 
 /**
- * Step 3: Targeted RAG Retrieval based on triage result
+ * Step 3: Retrieve structured clinical findings (NEW APPROACH - replaces RAG chunks)
+ *
+ * Uses LLM-extracted findings instead of mechanical chunks for better quality
  */
-async function retrieveRelevantEvidence(
+async function retrieveStructuredFindings(
+  drugName: string | null,
+  diagnosis: DiagnosisType,
+  triage: TriageResult
+): Promise<string[]> {
+  // If dose reduction is needed, retrieve structured findings
+  if ((triage.canDoseReduce || triage.shouldContinueCurrent) && drugName) {
+    try {
+      const findings = await prisma.clinicalFinding.findMany({
+        where: {
+          AND: [
+            {
+              OR: [
+                { drug: { contains: drugName, mode: 'insensitive' } },
+                { finding: { contains: drugName, mode: 'insensitive' } },
+              ],
+            },
+            {
+              OR: [
+                { indication: { contains: diagnosis, mode: 'insensitive' } },
+                { finding: { contains: diagnosis, mode: 'insensitive' } },
+              ],
+            },
+            {
+              findingType: {
+                in: ['DOSE_REDUCTION', 'INTERVAL_EXTENSION', 'SAFETY', 'EFFICACY']
+              },
+            },
+          ],
+        },
+        orderBy: [
+          { reviewed: 'desc' },  // Prioritize reviewed findings
+          { createdAt: 'desc' },
+        ],
+        take: 15,  // More findings for comprehensive evidence
+      });
+
+      if (findings.length > 0) {
+        // Format findings as clean, physician-ready text
+        return findings.map(f =>
+          `📄 ${f.paperTitle}\nCitation: ${f.citation}\nFinding: ${f.finding}`
+        );
+      }
+    } catch (error) {
+      console.error('Error retrieving structured findings:', error);
+      // Fall through to RAG fallback
+    }
+  }
+
+  // FALLBACK: Use old RAG approach if structured findings not available
+  return retrieveRelevantEvidenceFallback(drugName, diagnosis, triage);
+}
+
+/**
+ * Fallback: Original RAG retrieval (for backward compatibility)
+ */
+async function retrieveRelevantEvidenceFallback(
   drugName: string | null,
   diagnosis: DiagnosisType,
   triage: TriageResult
@@ -618,11 +676,11 @@ export async function generateLLMRecommendations(
   const triage = await triagePatient(assessment, genericDrugName || 'None', currentFormularyDrug || null, quadrant);
   console.log('Triage result:', JSON.stringify(triage));
 
-  // Step 3: Targeted RAG Retrieval (for LLM context, not for display)
-  // Note: This evidence helps the LLM generate recommendations but won't be shown to users
-  // Drug-specific evidence for DOSE_REDUCTION will be retrieved separately in Step 5
-  const evidence = await retrieveRelevantEvidence(genericDrugName, assessment.diagnosis, triage);
-  console.log(`Retrieved ${evidence.length} evidence chunks for LLM context`);
+  // Step 3: Retrieve structured clinical findings (NEW APPROACH - replaces RAG)
+  // Uses LLM-extracted findings for clean, physician-ready evidence
+  // Falls back to old RAG chunks if structured findings not available
+  const evidence = await retrieveStructuredFindings(genericDrugName, assessment.diagnosis, triage);
+  console.log(`Retrieved ${evidence.length} evidence items for LLM context (${evidence[0]?.includes('📄') ? 'structured findings' : 'RAG fallback'})`);
 
   // Step 4: Filter drugs by diagnosis, then by contraindications
   const diagnosisAppropriateDrugs = filterByDiagnosis(patientWithFormulary.plan.formularyDrugs, assessment.diagnosis);

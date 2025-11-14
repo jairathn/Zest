@@ -30,6 +30,9 @@ export default function RootLayout({
                     <Link href="/assess" className="text-gray-700 hover:text-primary-600 transition-all duration-150 active:scale-95 inline-block">
                       New Assessment
                     </Link>
+                    <Link href="/knowledge" className="text-gray-700 hover:text-primary-600 transition-all duration-150 active:scale-95 inline-block">
+                      Knowledge
+                    </Link>
                     <Link href="/admin" className="text-gray-700 hover:text-primary-600 transition-all duration-150 active:scale-95 inline-block">
                       Data Upload
                     </Link>
