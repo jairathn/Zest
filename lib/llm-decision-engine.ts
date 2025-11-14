@@ -340,7 +340,7 @@ CLINICAL EVIDENCE FROM KNOWLEDGE BASE (Use these papers for dose reduction citat
 
 ${evidenceText}
 
-IMPORTANT: When recommending DOSE_REDUCTION, cite specific papers by their titles shown above (e.g., "The CONDOR trial" or "Two-year follow-up study"). Extract the paper titles and cite them properly in your rationale.
+⚠️ CRITICAL: When recommending DOSE_REDUCTION, cite ALL relevant papers from the evidence above by their specific titles and authors. If multiple papers are available, cite all relevant ones. If only 1-2 papers are relevant, cite those accurately. NEVER hallucinate or invent citations. Extract paper titles/authors (e.g., "CONDOR trial (Atalay et al.)", "Piaserico et al.", "Hansel et al.") and build a truthful, evidence-based rationale. Accuracy > citation count.
 
 CONTRAINDICATION RULES (CRITICAL - NEVER recommend contraindicated drugs):
 - TNF inhibitors (adalimumab, infliximab, etanercept): CONTRAINDICATED if HEART_FAILURE or MULTIPLE_SCLEROSIS
@@ -411,11 +411,14 @@ PRIORITIZATION:
 
 EVIDENCE REQUIREMENTS (RAG):
 - **DOSE REDUCTION ONLY**:
-  * MUST cite SPECIFIC papers from the Clinical Evidence section above
-  * Reference papers by their actual titles (e.g., "The CONDOR trial (Atalay et al.)" or "BeNeBio trial")
-  * Include specific findings from the studies (e.g., "dose reduction was noninferior based on DLQI")
-  * The rationale should read like a mini literature review with proper citations
-  * DO NOT use generic phrases like "Based on RAG evidence" - cite the actual studies
+  * Cite ALL relevant papers from the Clinical Evidence section above - however many that is
+  * If 5 papers are relevant, cite all 5. If only 2 papers are relevant, cite those 2 accurately
+  * NEVER hallucinate or invent citations to reach a target number
+  * Reference papers by their actual titles and authors from the evidence above (e.g., "The CONDOR trial (Atalay et al.)", "Piaserico et al.")
+  * Include specific findings from the studies to build evidence-based rationale
+  * The rationale should transparently present what the literature actually shows
+  * Accuracy and truthfulness > citation count
+  * DO NOT use generic phrases like "Based on RAG evidence" - cite actual study names and authors when available
 - **FORMULARY SWITCHES**: NO RAG - cost optimization is self-evident business case
 - **THERAPEUTIC SWITCHES** (unstable escalation): NO RAG - standard clinical practice, provide rationale but no citations needed
 
@@ -431,10 +434,13 @@ Generate AT LEAST 3 specific recommendations ranked by clinical benefit and cost
    - SWITCHES: Provide FDA-approved SPECIFIC frequency (e.g., "every 2 weeks starting 1 week after initial dose")
    - NEVER use generic phrases like "Per label" - always specify the actual interval
 5. Detailed rationale:
-   - DOSE_REDUCTION: MUST cite specific papers by title from Clinical Evidence section
-     * Example: "The CONDOR trial demonstrated that dose reduction of adalimumab by extending intervals to every 4 weeks was noninferior to usual care based on DLQI (Atalay et al.). The 2-year follow-up study confirmed that 41% of patients maintained low-dose therapy without persistent flares."
-     * Reference specific findings, trial names, and outcomes
-     * DO NOT use vague phrases like "Based on RAG evidence" - cite actual study names
+   - DOSE_REDUCTION: Cite all relevant papers from Clinical Evidence section
+     * Example (when multiple papers available): "Multiple studies support adalimumab dose reduction in stable psoriasis. The CONDOR trial (Atalay et al.) demonstrated that extending dosing intervals to every 4 weeks was noninferior to usual care based on DLQI. The 2-year follow-up study confirmed that 41% of patients maintained low-dose therapy without persistent flares. Additional studies by Piaserico et al. and Hansel et al. showed successful down-titration with maintenance of clearance."
+     * Example (when fewer papers available): "The CONDOR trial (Atalay et al.) demonstrated that dose reduction of adalimumab by extending intervals was safe and effective in stable psoriasis patients."
+     * Cite ALL relevant papers, whether that's 1, 3, or 5+ papers
+     * Include specific findings, trial names, author names from the papers actually provided
+     * Build rationale based on what the evidence actually shows - never invent citations
+     * ACCURACY > CITATION COUNT - truthfulness is paramount
    - SWITCHES (formulary or therapeutic): Provide clear clinical reasoning, NO RAG citations needed
 6. Monitoring plan
 
