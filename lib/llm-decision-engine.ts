@@ -340,7 +340,7 @@ CLINICAL EVIDENCE FROM KNOWLEDGE BASE (Use these papers for dose reduction citat
 
 ${evidenceText}
 
-IMPORTANT: When recommending DOSE_REDUCTION, cite specific papers by their titles shown above (e.g., "The CONDOR trial" or "Two-year follow-up study"). Extract the paper titles and cite them properly in your rationale.
+⚠️ CRITICAL: When recommending DOSE_REDUCTION, you MUST cite 3-5 different papers by their specific titles and authors from the evidence above. DO NOT cite only 1-2 papers when many more are available. Extract paper titles/authors (e.g., "CONDOR trial (Atalay et al.)", "Piaserico et al.", "Hansel et al.") and build a comprehensive literature-based rationale with multiple citations.
 
 CONTRAINDICATION RULES (CRITICAL - NEVER recommend contraindicated drugs):
 - TNF inhibitors (adalimumab, infliximab, etanercept): CONTRAINDICATED if HEART_FAILURE or MULTIPLE_SCLEROSIS
@@ -411,11 +411,14 @@ PRIORITIZATION:
 
 EVIDENCE REQUIREMENTS (RAG):
 - **DOSE REDUCTION ONLY**:
-  * MUST cite SPECIFIC papers from the Clinical Evidence section above
-  * Reference papers by their actual titles (e.g., "The CONDOR trial (Atalay et al.)" or "BeNeBio trial")
-  * Include specific findings from the studies (e.g., "dose reduction was noninferior based on DLQI")
-  * The rationale should read like a mini literature review with proper citations
-  * DO NOT use generic phrases like "Based on RAG evidence" - cite the actual studies
+  * MUST cite MULTIPLE (3-5) SPECIFIC papers from the Clinical Evidence section above
+  * Look through all the papers provided and select the most relevant ones to cite
+  * Reference papers by their actual titles and authors (e.g., "The CONDOR trial (Atalay et al.)", "Piaserico et al.", "BeNeBio trial")
+  * Include specific findings from MULTIPLE studies to build converging evidence
+  * The rationale should read like a comprehensive mini literature review with 3-5 citations minimum
+  * Physicians need to see evidence from multiple independent sources, not just one trial
+  * DO NOT use generic phrases like "Based on RAG evidence" - cite actual study names and authors
+  * DO NOT cite only 1-2 papers when 10+ are available - use the evidence provided
 - **FORMULARY SWITCHES**: NO RAG - cost optimization is self-evident business case
 - **THERAPEUTIC SWITCHES** (unstable escalation): NO RAG - standard clinical practice, provide rationale but no citations needed
 
@@ -431,10 +434,12 @@ Generate AT LEAST 3 specific recommendations ranked by clinical benefit and cost
    - SWITCHES: Provide FDA-approved SPECIFIC frequency (e.g., "every 2 weeks starting 1 week after initial dose")
    - NEVER use generic phrases like "Per label" - always specify the actual interval
 5. Detailed rationale:
-   - DOSE_REDUCTION: MUST cite specific papers by title from Clinical Evidence section
-     * Example: "The CONDOR trial demonstrated that dose reduction of adalimumab by extending intervals to every 4 weeks was noninferior to usual care based on DLQI (Atalay et al.). The 2-year follow-up study confirmed that 41% of patients maintained low-dose therapy without persistent flares."
-     * Reference specific findings, trial names, and outcomes
-     * DO NOT use vague phrases like "Based on RAG evidence" - cite actual study names
+   - DOSE_REDUCTION: MUST cite MULTIPLE specific papers (3-5 studies) from Clinical Evidence section
+     * Example: "Multiple studies support adalimumab dose reduction in stable psoriasis. The CONDOR trial (Atalay et al.) demonstrated that extending dosing intervals to every 4 weeks was noninferior to usual care based on DLQI. The 2-year follow-up study confirmed that 41% of patients maintained low-dose therapy without persistent flares or safety issues. Additional studies by Piaserico et al. and Hansel et al. showed successful down-titration of adalimumab with maintenance of complete clearance. A multicenter observational study (Acta Derm Venereol 2016) reported similar findings with interval extension feasible in clinical practice."
+     * Reference 3-5 different papers from the Clinical Evidence section
+     * Include specific findings, trial names, author names, and outcomes from multiple studies
+     * Build a comprehensive literature-based argument by citing converging evidence from multiple sources
+     * DO NOT use vague phrases like "Based on RAG evidence" - cite actual study names and authors
    - SWITCHES (formulary or therapeutic): Provide clear clinical reasoning, NO RAG citations needed
 6. Monitoring plan
 
