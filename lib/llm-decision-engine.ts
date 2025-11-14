@@ -334,8 +334,13 @@ ${currentFormularyDrug ? `Tier ${currentFormularyDrug.tier}, PA: ${currentFormul
 Available Formulary Options:
 ${formularyText}
 
-Clinical Evidence:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CLINICAL EVIDENCE FROM KNOWLEDGE BASE (Use these papers for dose reduction citations):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 ${evidenceText}
+
+IMPORTANT: When recommending DOSE_REDUCTION, cite specific papers by their titles shown above (e.g., "The CONDOR trial" or "Two-year follow-up study"). Extract the paper titles and cite them properly in your rationale.
 
 CONTRAINDICATION RULES (CRITICAL - NEVER recommend contraindicated drugs):
 - TNF inhibitors (adalimumab, infliximab, etanercept): CONTRAINDICATED if HEART_FAILURE or MULTIPLE_SCLEROSIS
@@ -405,7 +410,12 @@ PRIORITIZATION:
 - For ${assessment.diagnosis}, consider drug class preferences from guidelines
 
 EVIDENCE REQUIREMENTS (RAG):
-- **DOSE REDUCTION ONLY**: Cite RAG evidence (clinically controversial, needs literature support)
+- **DOSE REDUCTION ONLY**:
+  * MUST cite SPECIFIC papers from the Clinical Evidence section above
+  * Reference papers by their actual titles (e.g., "The CONDOR trial (Atalay et al.)" or "BeNeBio trial")
+  * Include specific findings from the studies (e.g., "dose reduction was noninferior based on DLQI")
+  * The rationale should read like a mini literature review with proper citations
+  * DO NOT use generic phrases like "Based on RAG evidence" - cite the actual studies
 - **FORMULARY SWITCHES**: NO RAG - cost optimization is self-evident business case
 - **THERAPEUTIC SWITCHES** (unstable escalation): NO RAG - standard clinical practice, provide rationale but no citations needed
 
@@ -421,7 +431,10 @@ Generate AT LEAST 3 specific recommendations ranked by clinical benefit and cost
    - SWITCHES: Provide FDA-approved SPECIFIC frequency (e.g., "every 2 weeks starting 1 week after initial dose")
    - NEVER use generic phrases like "Per label" - always specify the actual interval
 5. Detailed rationale:
-   - DOSE_REDUCTION: MUST cite specific RAG evidence (trials, studies, intervals)
+   - DOSE_REDUCTION: MUST cite specific papers by title from Clinical Evidence section
+     * Example: "The CONDOR trial demonstrated that dose reduction of adalimumab by extending intervals to every 4 weeks was noninferior to usual care based on DLQI (Atalay et al.). The 2-year follow-up study confirmed that 41% of patients maintained low-dose therapy without persistent flares."
+     * Reference specific findings, trial names, and outcomes
+     * DO NOT use vague phrases like "Based on RAG evidence" - cite actual study names
    - SWITCHES (formulary or therapeutic): Provide clear clinical reasoning, NO RAG citations needed
 6. Monitoring plan
 
@@ -647,10 +660,16 @@ export async function generateLLMRecommendations(
     // Uses dynamic similarity-based retrieval to ensure all relevant evidence is included
     let drugSpecificEvidence: string[] = [];
     if (rec.type === 'DOSE_REDUCTION' && rec.drugName) {
+      // Use generic drug name (adalimumab) for queries, not brand name (Amjevita)
+      // Papers in knowledge base reference generic names
+      const drugNameForSearch = genericDrugName || rec.drugName;
+
       const queries = [
-        `${rec.drugName} dose reduction interval extension ${assessment.diagnosis} stable patients`,
-        `${rec.drugName} extended dosing efficacy safety ${assessment.diagnosis}`,
-        `${rec.drugName} treatment optimization ${assessment.diagnosis} guidelines`
+        `${drugNameForSearch} dose reduction interval extension ${assessment.diagnosis} stable patients`,
+        `${drugNameForSearch} extended dosing efficacy safety ${assessment.diagnosis}`,
+        `${drugNameForSearch} treatment optimization ${assessment.diagnosis} guidelines`,
+        `biologic dose reduction ${assessment.diagnosis} adalimumab etanercept ustekinumab`, // Broader query for general biologic dose reduction
+        `CONDOR trial dose reduction ${assessment.diagnosis}` // Specific trial name
       ];
 
       // Use dynamic similarity threshold (0.65 = moderately relevant)
