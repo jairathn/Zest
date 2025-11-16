@@ -6,6 +6,7 @@ import { parseClaimsCSV } from '@/lib/parsers/claims-parser';
 import { parseEligibilityCSV } from '@/lib/parsers/eligibility-parser';
 import { chunkTextByParagraph } from '@/lib/text-chunker';
 import { generateEmbedding } from '@/lib/rag/embeddings';
+import { findDrugByNdc } from '@/lib/ndc-mappings';
 
 export async function POST(request: NextRequest) {
   try {
@@ -189,9 +190,20 @@ async function handleClaimsUpload(csvText: string, fileName: string, datasetLabe
         uploadLogId: uploadLog.id,
       };
 
-      // Add optional fields
-      if (claimData.drugName) claimToInsert.drugName = claimData.drugName;
-      if (claimData.ndcCode) claimToInsert.ndcCode = claimData.ndcCode;
+      // Add drug information - convert NDC to drug name if needed
+      let drugName = claimData.drugName;
+      const ndcCode = claimData.ndcCode;
+
+      // If no drug name but have NDC, try to look it up
+      if (!drugName && ndcCode) {
+        const ndcMapping = findDrugByNdc(ndcCode);
+        if (ndcMapping) {
+          drugName = ndcMapping.drugName;
+        }
+      }
+
+      if (drugName) claimToInsert.drugName = drugName;
+      if (ndcCode) claimToInsert.ndcCode = ndcCode;
       if (claimData.daysSupply !== undefined) claimToInsert.daysSupply = claimData.daysSupply;
       if (claimData.quantity !== undefined) claimToInsert.quantity = claimData.quantity;
       if (claimData.diagnosisCode) claimToInsert.diagnosisCode = claimData.diagnosisCode;
@@ -253,13 +265,31 @@ async function handleEligibilityUpload(csvText: string, fileName: string) {
     });
   }
 
-  // Extract unique plan names from the CSV
-  const uniquePlanNames = [...new Set(rows.map(row => row.planName))];
+  // EMPLOYER TO PLAN MAPPING (PLACEHOLDER)
+  // TODO: Replace with configurable mapping or database table
+  const employerToPlanMapping: Record<string, string> = {
+    'API Heat Transfer': 'Aetna December 2024',
+    // Add more employer -> plan mappings here as needed
+  };
+
+  // Extract unique plan names and employers from the CSV
+  const uniquePlanNames = [...new Set(rows.map(row => row.planName).filter(Boolean))];
+  const uniqueEmployers = [...new Set(rows.map(row => row.employer).filter(Boolean))];
+
+  // Add mapped plan names from employers
+  for (const employer of uniqueEmployers) {
+    const mappedPlan = employerToPlanMapping[employer];
+    if (mappedPlan && !uniquePlanNames.includes(mappedPlan)) {
+      uniquePlanNames.push(mappedPlan);
+    }
+  }
 
   // Find or create insurance plans for each unique plan name
   const planNameToIdMap: Record<string, string> = {};
 
   for (const planName of uniquePlanNames) {
+    if (!planName) continue;
+
     let plan = await prisma.insurancePlan.findFirst({
       where: { planName },
     });
@@ -284,12 +314,19 @@ async function handleEligibilityUpload(csvText: string, fileName: string) {
 
   for (const row of rows) {
     try {
-      // Determine plan ID (if plan name is provided)
+      // Determine plan ID (if plan name is provided OR can be inferred from employer)
       let planId = null;
-      if (row.planName) {
-        planId = planNameToIdMap[row.planName];
+      let effectivePlanName = row.planName;
+
+      // If no plan name but has employer, try to map employer to plan
+      if (!effectivePlanName && row.employer) {
+        effectivePlanName = employerToPlanMapping[row.employer];
+      }
+
+      if (effectivePlanName) {
+        planId = planNameToIdMap[effectivePlanName];
         if (!planId) {
-          throw new Error(`Plan ID not found for plan name: ${row.planName}`);
+          throw new Error(`Plan ID not found for plan name: ${effectivePlanName}`);
         }
       }
 
@@ -304,7 +341,7 @@ async function handleEligibilityUpload(csvText: string, fileName: string) {
       if (row.externalId) patientData.externalId = row.externalId;
       if (row.pharmacyInsuranceId) patientData.pharmacyInsuranceId = row.pharmacyInsuranceId;
       if (planId) patientData.planId = planId;
-      if (row.planName) patientData.formularyPlanName = row.planName;
+      if (effectivePlanName) patientData.formularyPlanName = effectivePlanName;
       if (row.streetAddress) patientData.streetAddress = row.streetAddress;
       if (row.city) patientData.city = row.city;
       if (row.state) patientData.state = row.state;
