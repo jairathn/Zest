@@ -1,19 +1,19 @@
 import { z } from 'zod';
-import { DrugClass } from '@prisma/client';
 
 const formularySchema = z.object({
   drugName: z.string(),
   genericName: z.string().optional().default(''),
   drugClass: z.string(),
+  formulation: z.string().optional(),
+  strength: z.string().optional(),
   tier: z.number().int().min(1).max(5),
-  requiresPA: z.boolean().optional().default(false),
+  requiresPA: z.string().optional(),
   stepTherapyRequired: z.boolean().optional().default(false),
-  annualCostWAC: z.number().optional(),
-  memberCopayT1: z.number().optional(),
-  memberCopayT2: z.number().optional(),
-  memberCopayT3: z.number().optional(),
+  restrictions: z.string().optional(),
+  quantityLimit: z.string().optional(),
   biosimilarOf: z.string().optional(),
-  approvedIndications: z.array(z.string()).optional().default([]),
+  fdaIndications: z.array(z.string()).optional().default([]),
+  ndcCode: z.string().optional(),
 });
 
 type FormularyRow = z.infer<typeof formularySchema>;
@@ -22,15 +22,16 @@ const columnMappings = {
   drugName: ['drug name', 'drugname', 'drug', 'medication', 'brand name', 'brand'],
   genericName: ['generic name', 'genericname', 'generic'],
   drugClass: ['drug class', 'drugclass', 'class', 'category', 'type'],
+  formulation: ['formulation', 'dosage form', 'form'],
+  strength: ['strength', 'dose strength', 'concentration'],
   tier: ['tier', 'formulary tier', 'formulary_tier'],
   requiresPA: ['requires pa', 'pa required', 'prior auth', 'prior authorization', 'pa'],
   stepTherapyRequired: ['step therapy', 'step_therapy', 'step required'],
-  annualCostWAC: ['annual cost', 'wac', 'annual_cost_wac', 'yearly cost', 'cost'],
-  memberCopayT1: ['copay t1', 'tier 1 copay', 'copay_t1', 'tier1copay'],
-  memberCopayT2: ['copay t2', 'tier 2 copay', 'copay_t2', 'tier2copay'],
-  memberCopayT3: ['copay t3', 'tier 3 copay', 'copay_t3', 'tier3copay'],
+  restrictions: ['restrictions', 'restriction', 'limits'],
+  quantityLimit: ['quantity limit', 'quantity_limit', 'qty limit', 'ql'],
   biosimilarOf: ['biosimilar of', 'biosimilar_of', 'reference product', 'originator'],
-  approvedIndications: ['indications', 'approved indications', 'approved_indications'],
+  fdaIndications: ['fda indications', 'indications', 'approved indications', 'approved_indications'],
+  ndcCode: ['ndc code', 'ndc', 'ndc_code', 'national drug code'],
 };
 
 function normalizeColumnName(col: string): string {
@@ -52,19 +53,6 @@ function mapColumns(headers: string[]): Map<string, string> {
   }
 
   return mapping;
-}
-
-function parseDrugClass(value: string): DrugClass {
-  const normalized = value.toUpperCase().trim().replace(/[\s-]/g, '_');
-
-  if (normalized.includes('TNF')) return 'TNF_INHIBITOR';
-  if (normalized.includes('IL17') || normalized.includes('IL_17')) return 'IL17_INHIBITOR';
-  if (normalized.includes('IL23') || normalized.includes('IL_23')) return 'IL23_INHIBITOR';
-  if (normalized.includes('IL4') || normalized.includes('IL_4') || normalized.includes('IL13') || normalized.includes('IL_13')) return 'IL4_13_INHIBITOR';
-  if (normalized.includes('IL12') || normalized.includes('IL_12')) return 'IL12_23_INHIBITOR';
-  if (normalized.includes('JAK')) return 'JAK_INHIBITOR';
-
-  return 'OTHER';
 }
 
 function parseBoolean(value: any): boolean {
@@ -105,18 +93,19 @@ export function parseFormularyCSV(data: any[], planId: string): {
         planId,
         drugName: row[columnMap.get('drugName')!],
         genericName: columnMap.has('genericName') ? row[columnMap.get('genericName')!] : '',
-        drugClass: parseDrugClass(columnMap.has('drugClass') ? row[columnMap.get('drugClass')!] : 'OTHER'),
+        drugClass: columnMap.has('drugClass') ? String(row[columnMap.get('drugClass')!]) : 'OTHER',
+        formulation: columnMap.has('formulation') ? row[columnMap.get('formulation')!] : null,
+        strength: columnMap.has('strength') ? row[columnMap.get('strength')!] : null,
         tier: parseNumber(columnMap.has('tier') ? row[columnMap.get('tier')!] : 3) ?? 3,
-        requiresPA: columnMap.has('requiresPA') ? parseBoolean(row[columnMap.get('requiresPA')!]) : false,
+        requiresPA: columnMap.has('requiresPA') ? String(row[columnMap.get('requiresPA')!]) : null,
         stepTherapyRequired: columnMap.has('stepTherapyRequired') ? parseBoolean(row[columnMap.get('stepTherapyRequired')!]) : false,
-        annualCostWAC: parseNumber(columnMap.has('annualCostWAC') ? row[columnMap.get('annualCostWAC')!] : undefined),
-        memberCopayT1: parseNumber(columnMap.has('memberCopayT1') ? row[columnMap.get('memberCopayT1')!] : undefined),
-        memberCopayT2: parseNumber(columnMap.has('memberCopayT2') ? row[columnMap.get('memberCopayT2')!] : undefined),
-        memberCopayT3: parseNumber(columnMap.has('memberCopayT3') ? row[columnMap.get('memberCopayT3')!] : undefined),
+        restrictions: columnMap.has('restrictions') ? row[columnMap.get('restrictions')!] : null,
+        quantityLimit: columnMap.has('quantityLimit') ? row[columnMap.get('quantityLimit')!] : null,
         biosimilarOf: columnMap.has('biosimilarOf') ? row[columnMap.get('biosimilarOf')!] : null,
-        approvedIndications: columnMap.has('approvedIndications')
-          ? String(row[columnMap.get('approvedIndications')!]).split(',').map(s => s.trim())
+        fdaIndications: columnMap.has('fdaIndications')
+          ? String(row[columnMap.get('fdaIndications')!]).split(/[;,]/).map(s => s.trim()).filter(s => s.length > 0)
           : [],
+        ndcCode: columnMap.has('ndcCode') ? row[columnMap.get('ndcCode')!] : null,
       };
 
       parsedRows.push(parsed);
