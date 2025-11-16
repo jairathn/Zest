@@ -211,11 +211,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Increase file size limit for PDFs
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-};
+// Set maximum duration for long-running uploads (5 minutes)
+// This allows processing ~10 papers at ~30 seconds each
+export const maxDuration = 300; // 5 minutes in seconds (Vercel Pro/Enterprise)
+export const dynamic = 'force-dynamic'; // Disable caching for upload endpoint

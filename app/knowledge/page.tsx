@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, Trash2, CheckCircle, AlertCircle, FileText } from 'lucide-react';
+import { Upload, Trash2, CheckCircle, AlertCircle, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface KnowledgeStats {
   oldChunks: number;
@@ -26,27 +26,46 @@ export default function KnowledgePage() {
   const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalFindings, setTotalFindings] = useState(0);
+
   useEffect(() => {
     loadData();
   }, []);
 
+  // Reload when page or page size changes
+  useEffect(() => {
+    if (!loading) {
+      loadFindings();
+    }
+  }, [page, pageSize]);
+
   const loadData = async () => {
     try {
-      const [statsRes, findingsRes] = await Promise.all([
-        fetch('/api/knowledge/stats'),
-        fetch('/api/knowledge/findings?limit=20')
-      ]);
-
-      const statsData = await statsRes.json();
-      const findingsData = await findingsRes.json();
-
-      setStats(statsData);
-      setFindings(findingsData.findings || []);
+      await Promise.all([loadStats(), loadFindings()]);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadStats = async () => {
+    const statsRes = await fetch('/api/knowledge/stats');
+    const statsData = await statsRes.json();
+    setStats(statsData);
+  };
+
+  const loadFindings = async () => {
+    const skip = (page - 1) * pageSize;
+    const limit = pageSize === 0 ? 0 : pageSize; // 0 means "all"
+    const findingsRes = await fetch(`/api/knowledge/findings?limit=${limit}&skip=${skip}`);
+    const findingsData = await findingsRes.json();
+
+    setFindings(findingsData.findings || []);
+    setTotalFindings(findingsData.total || 0);
   };
 
   const handleDeleteOldChunks = async () => {
@@ -90,18 +109,36 @@ export default function KnowledgePage() {
         body: formData,
       });
 
-      const data = await res.json();
+      // Handle timeout (504) or other non-JSON responses
+      if (!res.ok && res.status === 504) {
+        // Gateway timeout - processing may have completed on backend
+        alert(`⚠️ Upload timed out, but processing may have completed in the background.\n\nRefreshing to check for new findings...`);
+        await loadData();
+        return;
+      }
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonError) {
+        // JSON parse error (likely from timeout or network issue)
+        console.error('Failed to parse response:', jsonError);
+        alert(`⚠️ Upload response was incomplete (network timeout).\n\nRefreshing to check if findings were extracted...`);
+        await loadData();
+        return;
+      }
 
       if (data.success) {
         alert(`✅ Extracted ${data.totalFindings} findings from ${data.filesProcessed} papers!\n\n⚠️ Review findings before using in production.`);
-        loadData();
       } else {
         alert('Error uploading: ' + data.error);
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error uploading files');
+      alert(`⚠️ Upload error: ${error}\n\nRefreshing to check if any findings were extracted...`);
     } finally {
+      // Always refresh data to show any findings that may have been extracted
+      await loadData();
       setUploading(false);
       // Reset file input
       e.target.value = '';
@@ -117,12 +154,22 @@ export default function KnowledgePage() {
       });
 
       if (res.ok) {
-        loadData();
+        // Reload stats and current page of findings
+        await Promise.all([loadStats(), loadFindings()]);
       }
     } catch (error) {
       console.error('Error updating finding:', error);
     }
   };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setPage(1); // Reset to first page when changing page size
+  };
+
+  const totalPages = pageSize === 0 ? 1 : Math.ceil(totalFindings / pageSize);
+  const startIndex = pageSize === 0 ? 1 : (page - 1) * pageSize + 1;
+  const endIndex = pageSize === 0 ? totalFindings : Math.min(page * pageSize, totalFindings);
 
   if (loading) {
     return (
@@ -225,8 +272,26 @@ export default function KnowledgePage() {
       {/* Recent Findings */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2>Recent Findings</h2>
-          <span className="text-sm text-gray-500">Showing {findings.length} most recent</span>
+          <h2>Clinical Findings</h2>
+          <div className="flex items-center gap-4">
+            {/* Page size selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Show:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
+                className="text-sm border border-gray-300 rounded px-2 py-1"
+              >
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={0}>All ({totalFindings})</option>
+              </select>
+            </div>
+            <span className="text-sm text-gray-500">
+              {totalFindings > 0 ? `${startIndex}-${endIndex} of ${totalFindings}` : 'No findings'}
+            </span>
+          </div>
         </div>
 
         {findings.length === 0 ? (
@@ -279,6 +344,52 @@ export default function KnowledgePage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pagination controls */}
+        {totalFindings > 0 && pageSize > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6 pt-4 border-t">
+            <button
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Previous
+            </button>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">
+                Page {page} of {totalPages}
+              </span>
+              {/* Quick jump to first/last page */}
+              {page > 2 && (
+                <button
+                  onClick={() => setPage(1)}
+                  className="px-3 py-1 text-sm text-blue-600 hover:underline"
+                >
+                  First
+                </button>
+              )}
+              {page < totalPages - 1 && (
+                <button
+                  onClick={() => setPage(totalPages)}
+                  className="px-3 py-1 text-sm text-blue-600 hover:underline"
+                >
+                  Last
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => setPage(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         )}
       </div>
