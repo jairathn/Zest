@@ -484,7 +484,10 @@ EVIDENCE REQUIREMENTS (RAG):
 
 Generate AT LEAST 3 specific recommendations ranked by clinical benefit and cost savings. For EACH recommendation:
 1. Type (DOSE_REDUCTION, SWITCH_TO_BIOSIMILAR, SWITCH_TO_PREFERRED, THERAPEUTIC_SWITCH, OPTIMIZE_CURRENT, or CONTINUE_CURRENT)
-2. Specific drug name (MUST be from formulary options above, or current drug for CONTINUE_CURRENT/OPTIMIZE_CURRENT)
+2. Specific drug name:
+   - For CONTINUE_CURRENT or OPTIMIZE_CURRENT: MUST be "${currentBrandName}" (the patient's current medication)
+   - For DOSE_REDUCTION: MUST be "${currentBrandName}" (reducing dose of current medication)
+   - For SWITCH recommendations: MUST be from formulary options listed above
 3. New dose:
    - DOSE_REDUCTION: Extract SPECIFIC reduced dose from RAG evidence (e.g., "40 mg")
    - SWITCHES: Provide FDA-approved SPECIFIC dose (e.g., "80 mg initial, then 40 mg" or "300 mg")
@@ -797,10 +800,10 @@ export async function generateLLMRecommendations(
         .filter(Boolean); // Remove nulls
     }
 
-    // For dose reduction, display the BRAND name (Amjevita) not generic (adalimumab)
+    // For dose reduction and continue current, display the BRAND name (Humira) not generic (adalimumab)
     // since Amjevita, Hyrimoz, and Humira are all adalimumab but different products
-    const displayDrugName = rec.type === 'DOSE_REDUCTION' && currentBiologic
-      ? currentBiologic.drugName  // Brand name: "Amjevita"
+    const displayDrugName = (rec.type === 'DOSE_REDUCTION' || rec.type === 'CONTINUE_CURRENT' || rec.type === 'OPTIMIZE_CURRENT') && currentBiologic
+      ? currentBiologic.drugName  // Brand name: "Humira"
       : rec.drugName || genericDrugName;  // For switches, use target drug
 
     // Get FDA-approved dosing if LLM didn't provide specific dosing or used "Per label"
