@@ -76,8 +76,9 @@ export default async function RecommendationsPage({ params }: PageProps) {
   };
 
   // Get safe formulary drugs (filtered for diagnosis AND contraindications)
+  const formularyDrugs = assessment.patient.plan?.formularyDrugs || [];
   const diagnosisAppropriateDrugs = filterByDiagnosis(
-    assessment.patient.plan.formularyDrugs,
+    formularyDrugs,
     assessment.diagnosis
   );
   const safeFormularyDrugs = filterContraindicated(
@@ -102,7 +103,7 @@ export default async function RecommendationsPage({ params }: PageProps) {
 
   // Find current drug's tier from formulary
   const currentDrugTier = currentBiologic
-    ? assessment.patient.plan.formularyDrugs.find(
+    ? formularyDrugs.find(
         drug => drug.drugName.toLowerCase() === currentBiologic.drugName.toLowerCase()
       )?.tier
     : undefined;
@@ -115,7 +116,7 @@ export default async function RecommendationsPage({ params }: PageProps) {
           Recommendations for {assessment.patient.firstName} {assessment.patient.lastName}
         </h1>
         <div className="flex items-center gap-6 text-sm text-gray-600">
-          <span>Plan: {assessment.patient.plan.planName}</span>
+          <span>Plan: {assessment.patient.plan?.planName || assessment.patient.formularyPlanName || 'Unknown'}</span>
           <span>•</span>
           <span>
             Current: {currentBiologic?.drugName || 'None'} {currentBiologic?.dose} {currentBiologic?.frequency}

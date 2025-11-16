@@ -81,7 +81,7 @@ function determineQuadrantAndStatus(
   // Check for stable but insufficient duration - special case
   if (isStableShortDuration(dlqiScore, monthsStable)) {
     const isFormularyOptimal = currentFormularyDrug
-      ? (currentFormularyDrug.tier === 1 && !currentFormularyDrug.requiresPA)
+      ? (currentFormularyDrug.tier === 1 && currentFormularyDrug.requiresPA !== 'Yes')
       : false;
     return {
       isStable: true, // Patient IS stable, just not for long enough
@@ -94,9 +94,9 @@ function determineQuadrantAndStatus(
   const isStable = dlqiScore <= 1 && monthsStable >= 6;
 
   // Formulary optimal: ONLY Tier 1 without PA
-  // Tier 2-3 = suboptimal even if "aligned"
+  // Tier 2-5 = suboptimal even if "aligned"
   const isFormularyOptimal = currentFormularyDrug
-    ? (currentFormularyDrug.tier === 1 && !currentFormularyDrug.requiresPA)
+    ? (currentFormularyDrug.tier === 1 && currentFormularyDrug.requiresPA !== 'Yes')
     : false;
 
   // Determine quadrant
@@ -135,18 +135,19 @@ Patient Information:
 
 Formulary Status:
 - Tier: ${formularyDrug?.tier || 'Unknown'}
-- Requires PA: ${formularyDrug?.requiresPA ? 'Yes' : 'No'}
+- Requires PA: ${formularyDrug?.requiresPA || 'Unknown'}
 - Classification: ${quadrant.replace(/_/g, ' ').toUpperCase()}
 
 The patient has been classified as: ${quadrant}
 - not_on_biologic: Patient needs biologic initiation → Recommend best Tier 1 option
 - stable_short_duration: Patient is stable (DLQI ≤1) but for <6 months → Continue current therapy, re-evaluate after sufficient time
 - stable_optimal: Stable + Tier 1 without PA → Consider dose reduction OR within-tier optimization
-- stable_suboptimal: Stable + Tier 2-3 → MUST recommend switch to Tier 1
+- stable_suboptimal: Stable + Tier 2-5 → MUST recommend switch to Tier 1
 - unstable_optimal: Unstable + Tier 1 → Consider different Tier 1 option or optimize current
-- unstable_suboptimal: Unstable + Tier 2-3 → ⚠️ MUST recommend switch to Tier 1 (NEVER just continue or optimize current)
+- unstable_suboptimal: Unstable + Tier 2-5 → ⚠️ MUST recommend switch to Tier 1 (NEVER just continue or optimize current)
 
-CRITICAL: Tier 2 and Tier 3 indicate room for optimization. These patients should ALWAYS get switch recommendations to Tier 1.
+CRITICAL: Tier 2, 3, 4, and 5 indicate room for optimization. These patients should ALWAYS get switch recommendations to Tier 1.
+NOTE: Tier 5 typically means "Not Covered" - these patients need immediate switching.
 
 Based on the quadrant "${quadrant}", determine:
 1. Should dose reduction be considered? (Only for stable_optimal AND currently Tier 1, NOT for stable_short_duration)
@@ -389,7 +390,7 @@ Patient Information:
 - Contraindications: ${contraindicationText}
 
 Current Formulary Status:
-${currentFormularyDrug ? `Tier ${currentFormularyDrug.tier}, PA: ${currentFormularyDrug.requiresPA ? 'Yes' : 'No'}, Annual Cost: $${currentFormularyDrug.annualCostWAC}` : 'Not on formulary'}
+${currentFormularyDrug ? `Tier ${currentFormularyDrug.tier}, PA: ${currentFormularyDrug.requiresPA || 'Unknown'}, Annual Cost: $${currentFormularyDrug.annualCostWAC}` : 'Not on formulary'}
 
 Available Formulary Options:
 ${formularyText}
@@ -409,14 +410,24 @@ CONTRAINDICATION RULES (CRITICAL - NEVER recommend contraindicated drugs):
 - Contraindicated drugs have been PRE-FILTERED from formulary options shown above
 
 CRITICAL TIER OPTIMIZATION RULES:
-⚠️ **Tier 2 and Tier 3 should ALMOST NEVER result in CONTINUE or just OPTIMIZE_CURRENT**
+⚠️ **Tier 2, 3, 4, or 5 should ALMOST NEVER result in CONTINUE or just OPTIMIZE_CURRENT**
    - There is ALWAYS room to optimize by moving to Tier 1
    - Generate SWITCH recommendations to Tier 1 drugs
+   - Tier 5 = "Not Covered" requires URGENT switching
    - Only use CONTINUE if you absolutely cannot generate 3 switch options
 
 ⚠️ **CONTINUE should ONLY be used when:**
    - Already on Tier 1 AND stable AND dose-reduced/optimized (truly no more optimization possible)
    - OR you cannot generate 3 other recommendations despite trying
+
+TIER HIERARCHY (1-5 scale):
+   - Tier 1: Preferred, lowest cost-share
+   - Tier 2: Non-preferred, higher cost-share
+   - Tier 3: Higher tier, much higher cost-share
+   - Tier 4: Very high tier, very high cost-share
+   - Tier 5: Not covered (patient pays full cost)
+
+Goal: Move patients from higher tiers (2-5) to Tier 1 when clinically appropriate
 
 CLINICAL DECISION-MAKING GUIDELINES:
 1. **not_on_biologic**: Recommend BEST Tier 1 option based on:
@@ -439,34 +450,45 @@ CLINICAL DECISION-MAKING GUIDELINES:
    - ⚠️ NEVER recommend "switching" to the current drug - that's a continuation, not a switch
    - The current drug has been EXCLUDED from the formulary options list below
 
-4. **stable_suboptimal** - TIER-SPECIFIC STRATEGY:
+4. **stable_suboptimal** - TIER-SPECIFIC STRATEGY (Tiers 2-5):
 
-   a. **Tier 2 (stable)** - Two options, ranked by cost savings:
-      - OPTION 1 (Preferred): Switch to Tier 1 biosimilar or same-class drug
-      - OPTION 2 (Alternative): Dose reduction of current Tier 2 drug (cite RAG evidence)
-      - Rank by total cost optimization potential
+   ALWAYS generate 3 recommendations ranked by priority:
+
+   a. **Primary: Switch to Tier 1** (Recommendations 1-N):
+      - Recommend ALL available Tier 1 options for the diagnosis
+      - Prioritize biosimilars of current drug if available
+      - Then same-class drugs (e.g., if on TNF inhibitor, recommend other TNF inhibitors in Tier 1)
+      - Then cross-class if better efficacy
       - No RAG needed for switch rationale (formulary alignment is self-evident)
 
-   b. **Tier 3 (stable)** - Switch ONLY (NEVER dose reduce):
-      - MUST switch to Tier 1 or Tier 2 (prefer Tier 1)
-      - Prioritize biosimilars of same drug if available
-      - Then same-class drugs
-      - Then cross-class if better efficacy
-      - No RAG needed for switch rationale (cost optimization is obvious)
+   b. **Secondary: Dose Reduction** (If <3 Tier 1 options available):
+      - ONLY for Tier 2 or Tier 3 patients (NOT Tier 4-5)
+      - Reduce dose/extend interval of current drug (cite RAG evidence)
+      - Example: If only 1 Tier 1 option available → Rec 1: Switch to Tier 1, Rec 2: Dose reduce current, Rec 3: Switch to best Tier 2
+
+   c. **Tertiary: Next Best Tier** (If still <3 recommendations):
+      - Recommend next best available tier (e.g., Tier 2 if no more Tier 1 options)
+      - Only if absolutely necessary to reach 3 total recommendations
+
+   d. **Tier-Specific Notes**:
+      - Tier 2: Both switch to Tier 1 AND dose reduction are viable
+      - Tier 3: Prefer switch to Tier 1, dose reduction only if needed for 3rd recommendation
+      - Tier 4-5: NEVER dose reduce, ONLY switch to lower tiers (urgently to Tier 1)
 
 5. **unstable_optimal** (Tier 1, unstable):
    - Switch to different Tier 1 with superior efficacy (cite evidence)
    - Prefer different mechanism of action (e.g., if TNF failed, try IL-17 or IL-23)
    - Target drugs with proven higher efficacy for ${assessment.diagnosis}
 
-6. **unstable_suboptimal** (Tier 2-3, unstable):
+6. **unstable_suboptimal** (Tier 2-5, unstable):
    - Switch to Tier 1 drug with best efficacy for ${assessment.diagnosis} (cite evidence)
    - Prefer different mechanism if current class failing
-   - If Tier 3 and same class as better Tier 1/2 option, recommend that
+   - NEVER dose reduce (patient is unstable - needs better control)
+   - For Tier 4-5: URGENT switch to Tier 1 (patient paying very high cost for suboptimal control)
 
 PRIORITIZATION:
-- Always prefer Tier 1 > Tier 2 > Tier 3
-- Within same tier: Higher efficacy > Lower cost
+- Always prefer Tier 1 > Tier 2 > Tier 3 > Tier 4 > Tier 5
+- Within same tier: Higher efficacy > Lower cost > Simpler dosing
 - For ${assessment.diagnosis}, consider drug class preferences from guidelines
 
 EVIDENCE REQUIREMENTS (RAG):
@@ -619,21 +641,39 @@ export async function generateLLMRecommendations(
     throw new Error('Patient or plan not found');
   }
 
+  // Determine the effective plan ID (either direct planId or resolved from formularyPlanName)
+  let effectivePlanId = patient.planId;
+
+  if (!effectivePlanId && patient.formularyPlanName) {
+    // If no planId but has formularyPlanName, try to find the plan by name
+    const planByName = await prisma.insurancePlan.findFirst({
+      where: { planName: patient.formularyPlanName },
+    });
+    if (planByName) {
+      effectivePlanId = planByName.id;
+      console.log(`  ℹ️ Resolved formularyPlanName "${patient.formularyPlanName}" to planId: ${effectivePlanId}`);
+    } else {
+      console.warn(`  ⚠️ Patient has formularyPlanName "${patient.formularyPlanName}" but no matching InsurancePlan found`);
+    }
+  }
+
   // Get the most recent formulary upload for this plan
-  const mostRecentUpload = await prisma.uploadLog.findFirst({
-    where: {
-      uploadType: 'FORMULARY',
-      planId: patient.planId,
-    },
-    orderBy: { uploadedAt: 'desc' },
-    select: { id: true },
-  });
+  const mostRecentUpload = effectivePlanId
+    ? await prisma.uploadLog.findFirst({
+        where: {
+          uploadType: 'FORMULARY',
+          planId: effectivePlanId,
+        },
+        orderBy: { uploadedAt: 'desc' },
+        select: { id: true },
+      })
+    : null;
 
   // Fetch formulary drugs from the most recent upload only
-  const formularyDrugs = mostRecentUpload
+  const formularyDrugs = mostRecentUpload && effectivePlanId
     ? await prisma.formularyDrug.findMany({
         where: {
-          planId: patient.planId,
+          planId: effectivePlanId,
           uploadLogId: mostRecentUpload.id,
         },
       })

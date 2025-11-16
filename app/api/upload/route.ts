@@ -265,10 +265,14 @@ async function handleEligibilityUpload(csvText: string, fileName: string) {
     });
   }
 
-  // EMPLOYER TO PLAN MAPPING (PLACEHOLDER)
-  // TODO: Replace with configurable mapping or database table
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // EMPLOYER TO PLAN MAPPING (PLACEHOLDER - HARDCODED FOR NOW)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // TODO: Replace with configurable mapping (admin UI or database table)
+  // This hardcoded mapping assumes all employees of a given employer are on the same plan.
+  // In production, this should be replaced with a proper employer-plan relationship system.
   const employerToPlanMapping: Record<string, string> = {
-    'API Heat Transfer': 'Aetna December 2024',
+    'API Heat Transfer': 'United 2025',  // PLACEHOLDER: Update as needed
     // Add more employer -> plan mappings here as needed
   };
 

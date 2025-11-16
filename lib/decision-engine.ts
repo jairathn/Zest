@@ -130,7 +130,7 @@ export function determineFormularyStatus(
 ): boolean {
   if (!currentDrug) return false;
   // Optimal ONLY if Tier 1 and no PA required
-  // Tier 2-3 are always suboptimal (cost optimization opportunities exist)
+  // Tier 2-5 are always suboptimal (cost optimization opportunities exist)
   const paRequired = currentDrug.requiresPA && currentDrug.requiresPA !== 'No' && currentDrug.requiresPA !== 'N/A';
   return currentDrug.tier === 1 && !paRequired;
 }
