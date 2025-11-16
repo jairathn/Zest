@@ -210,11 +210,13 @@ async function retrieveStructuredFindings(
                 in: ['DOSE_REDUCTION', 'INTERVAL_EXTENSION', 'SAFETY', 'EFFICACY']
               },
             },
+            // CRITICAL: Only use human-reviewed findings in decision engine
+            // Unreviewed findings may contain errors or irrelevant information
+            { reviewed: true },
           ],
         },
         orderBy: [
-          { reviewed: 'desc' },  // Prioritize reviewed findings
-          { createdAt: 'desc' },
+          { createdAt: 'desc' },  // Most recent first
         ],
         take: 15,  // More findings for comprehensive evidence
       });

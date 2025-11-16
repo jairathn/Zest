@@ -31,6 +31,9 @@ export default function KnowledgePage() {
   const [pageSize, setPageSize] = useState(20);
   const [totalFindings, setTotalFindings] = useState(0);
 
+  // Loading state for individual findings being reviewed
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -146,6 +149,7 @@ export default function KnowledgePage() {
   };
 
   const handleReviewFinding = async (findingId: string, reviewed: boolean) => {
+    setReviewingId(findingId);
     try {
       const res = await fetch(`/api/knowledge/findings/${findingId}`, {
         method: 'PATCH',
@@ -156,9 +160,14 @@ export default function KnowledgePage() {
       if (res.ok) {
         // Reload stats and current page of findings
         await Promise.all([loadStats(), loadFindings()]);
+      } else {
+        alert('Error updating finding. Please try again.');
       }
     } catch (error) {
       console.error('Error updating finding:', error);
+      alert('Error updating finding. Please try again.');
+    } finally {
+      setReviewingId(null);
     }
   };
 
@@ -318,13 +327,14 @@ export default function KnowledgePage() {
                   </div>
                   <button
                     onClick={() => handleReviewFinding(finding.id, !finding.reviewed)}
-                    className={`ml-4 px-3 py-1 rounded text-sm font-medium ${
+                    disabled={reviewingId === finding.id}
+                    className={`ml-4 px-3 py-1 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-wait ${
                       finding.reviewed
                         ? 'bg-green-600 text-white hover:bg-green-700'
                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
                   >
-                    {finding.reviewed ? '✓ Reviewed' : 'Mark Reviewed'}
+                    {reviewingId === finding.id ? '...' : (finding.reviewed ? '✓ Reviewed' : 'Mark Reviewed')}
                   </button>
                 </div>
 

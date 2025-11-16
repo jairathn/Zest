@@ -46,9 +46,9 @@ export async function searchClinicalFindings(
         {
           findingType: { in: findingTypes },
         },
-        // Only include reviewed findings in production
-        // For testing, you can remove this filter
-        // { reviewed: true },
+        // CRITICAL: Only include reviewed findings in production
+        // Unreviewed findings may contain errors or be irrelevant
+        { reviewed: true },
       ],
     },
     orderBy: [

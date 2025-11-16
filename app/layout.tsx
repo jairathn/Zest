@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
+import { NavigationProgress } from "./components/NavigationProgress";
 
 export const metadata: Metadata = {
   title: "Zest Fulcrum",
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <NavigationProgress />
         <div className="min-h-screen flex flex-col">
           <header className="bg-white border-b">
             <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
