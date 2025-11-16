@@ -61,6 +61,15 @@ function isStableShortDuration(dlqiScore: number, monthsStable: number): boolean
 }
 
 /**
+ * Convert string requiresPA value to boolean
+ * FormularyDrug stores as String ("Yes", "No", "N/A", "Unknown")
+ * Recommendation stores as Boolean
+ */
+function convertRequiresPAToBoolean(requiresPA: string | null | undefined): boolean {
+  return requiresPA === 'Yes';
+}
+
+/**
  * Determine formulary status and quadrant using hard-coded rules
  */
 function determineQuadrantAndStatus(
@@ -919,9 +928,10 @@ export async function generateLLMRecommendations(
       tier: rec.type === 'DOSE_REDUCTION'
         ? currentFormularyDrug?.tier
         : (targetDrug?.tier || currentFormularyDrug?.tier),
+      // Convert string requiresPA to boolean (FormularyDrug uses String, Recommendation uses Boolean)
       requiresPA: rec.type === 'DOSE_REDUCTION'
-        ? currentFormularyDrug?.requiresPA
-        : (targetDrug?.requiresPA || currentFormularyDrug?.requiresPA),
+        ? convertRequiresPAToBoolean(currentFormularyDrug?.requiresPA)
+        : convertRequiresPAToBoolean(targetDrug?.requiresPA || currentFormularyDrug?.requiresPA),
       contraindicated: false, // LLM should handle contraindications in rationale
       contraindicationReason: undefined,
     };

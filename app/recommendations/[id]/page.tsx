@@ -211,7 +211,7 @@ export default async function RecommendationsPage({ params }: PageProps) {
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
                       {rec.type.replace(/_/g, ' ')} • Tier {rec.tier || 'N/A'}
-                      {rec.requiresPA && rec.requiresPA !== 'No' && ` • PA: ${rec.requiresPA}`}
+                      {rec.requiresPA && ` • Prior Auth Required`}
                     </p>
                   </div>
                 </div>
