@@ -107,12 +107,16 @@ export default async function RecommendationsPage({ params }: PageProps) {
       if (!drug.fdaIndications || drug.fdaIndications.length === 0) {
         return true;
       }
-      // Check if the diagnosis is in the FDA indications list (case-insensitive)
+      // Check if the diagnosis matches any FDA indication (case-insensitive, partial match)
       // Handle both "PSORIASIS" (enum) and "Psoriasis" (data) formats
+      // Also handle abbreviations like "PsA" for Psoriatic Arthritis
       const diagnosisLower = diagnosis.toLowerCase().replace(/_/g, ' ');
-      return drug.fdaIndications.some((indication: string) =>
-        indication.toLowerCase().replace(/_/g, ' ') === diagnosisLower
-      );
+
+      return drug.fdaIndications.some((indication: string) => {
+        const indicationLower = indication.toLowerCase().replace(/_/g, ' ');
+        // Exact match OR partial match (e.g., "psoriasis" matches "psoriatic arthritis")
+        return indicationLower.includes(diagnosisLower) || diagnosisLower.includes(indicationLower);
+      });
     });
   };
 
