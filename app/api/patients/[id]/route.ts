@@ -12,6 +12,10 @@ export async function GET(
         currentBiologics: true,
         contraindications: true,
         plan: true,
+        claims: {
+          orderBy: { fillDate: 'desc' },
+          take: 5, // Get most recent 5 claims for auto-fill
+        },
       },
     });
 
