@@ -36,6 +36,43 @@ export default async function RecommendationsPage({ params }: PageProps) {
     notFound();
   }
 
+  // Resolve formulary drugs (same logic as decision engine)
+  // If patient has formularyPlanName but no linked plan, look up the plan by name
+  let effectivePlanId = assessment.patient.planId;
+  if (!effectivePlanId && assessment.patient.formularyPlanName) {
+    const planByName = await prisma.insurancePlan.findFirst({
+      where: { planName: assessment.patient.formularyPlanName },
+    });
+    if (planByName) {
+      effectivePlanId = planByName.id;
+    }
+  }
+
+  // Fetch formulary drugs from the most recent upload for the effective plan
+  const mostRecentUpload = effectivePlanId
+    ? await prisma.uploadLog.findFirst({
+        where: {
+          uploadType: 'FORMULARY',
+          planId: effectivePlanId,
+        },
+        orderBy: { uploadedAt: 'desc' },
+        select: { id: true },
+      })
+    : null;
+
+  const fetchedFormularyDrugs = mostRecentUpload && effectivePlanId
+    ? await prisma.formularyDrug.findMany({
+        where: {
+          planId: effectivePlanId,
+          uploadLogId: mostRecentUpload.id,
+        },
+        orderBy: [
+          { tier: 'asc' },
+          { requiresPA: 'asc' },
+        ],
+      })
+    : [];
+
   // Filter out contraindicated drugs from formulary reference
   const filterContraindicated = (drugs: any[], contraindications: any[]) => {
     if (contraindications.length === 0) return drugs;
@@ -76,9 +113,9 @@ export default async function RecommendationsPage({ params }: PageProps) {
   };
 
   // Get safe formulary drugs (filtered for diagnosis AND contraindications)
-  const formularyDrugs = assessment.patient.plan?.formularyDrugs || [];
+  // Use fetchedFormularyDrugs from the plan resolution above
   const diagnosisAppropriateDrugs = filterByDiagnosis(
-    formularyDrugs,
+    fetchedFormularyDrugs,
     assessment.diagnosis
   );
   const safeFormularyDrugs = filterContraindicated(
@@ -103,7 +140,7 @@ export default async function RecommendationsPage({ params }: PageProps) {
 
   // Find current drug's tier from formulary
   const currentDrugTier = currentBiologic
-    ? formularyDrugs.find(
+    ? fetchedFormularyDrugs.find(
         drug => drug.drugName.toLowerCase() === currentBiologic.drugName.toLowerCase()
       )?.tier
     : undefined;
