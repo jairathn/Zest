@@ -48,6 +48,58 @@ export default function AssessmentPage() {
       });
   }, []);
 
+  // Auto-fill current biologic from most recent claims when patient is selected
+  const handlePatientChange = async (patientId: string) => {
+    setFormData({ ...formData, patientId });
+
+    if (!patientId) return;
+
+    try {
+      // Fetch patient data with claims
+      const res = await fetch(`/api/patients/${patientId}`);
+      const patientData = await res.json();
+
+      // If patient has recent claims with NDC codes, auto-fill biologic info
+      if (patientData.claims && patientData.claims.length > 0) {
+        // Find most recent claim with NDC code
+        const claimWithNdc = patientData.claims.find((claim: any) => claim.ndcCode);
+
+        if (claimWithNdc?.ndcCode) {
+          // Fetch drug info from NDC mapping
+          const ndcRes = await fetch(`/api/ndc-lookup?ndc=${claimWithNdc.ndcCode}`);
+          const drugInfo = await ndcRes.json();
+
+          if (drugInfo && drugInfo.drugName) {
+            setFormData(prev => ({
+              ...prev,
+              patientId,
+              currentBiologic: drugInfo.drugName,
+              dose: drugInfo.strength || prev.dose,
+              frequency: 'As prescribed', // Can be customized based on data
+            }));
+            return;
+          }
+        }
+      }
+
+      // If no NDC data, check for existing current biologics
+      if (patientData.currentBiologics && patientData.currentBiologics.length > 0) {
+        const currentBio = patientData.currentBiologics[0];
+        setFormData(prev => ({
+          ...prev,
+          patientId,
+          currentBiologic: currentBio.drugName,
+          dose: currentBio.dose,
+          frequency: currentBio.frequency,
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching patient data:', error);
+      // Just set the patient ID even if auto-fill fails
+      setFormData({ ...formData, patientId });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -125,7 +177,7 @@ export default function AssessmentPage() {
           <select
             className="input w-full"
             value={formData.patientId}
-            onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
+            onChange={(e) => handlePatientChange(e.target.value)}
             required
           >
             <option value="">Select a patient</option>

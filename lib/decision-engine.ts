@@ -276,12 +276,6 @@ export async function generateRecommendations(
       drugName: currentBiologic.drugName,
       newDose: currentBiologic.dose,
       newFrequency: currentBiologic.frequency,
-      currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-      recommendedAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-      annualSavings: 0,
-      savingsPercent: 0,
-      currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-      recommendedMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
       rationale: `Patient has excellent disease control (DLQI ${assessment.dlqiScore}) but has only been stable for ${assessment.monthsStable} months. Continue current therapy for ${monthsNeeded} more months to establish sustained stability, then re-evaluate for potential dose optimization or formulary alignment.`,
       evidenceSources: [],
       monitoringPlan: `Monitor DLQI monthly. Re-assess at ${assessment.monthsStable + monthsNeeded} months for therapy optimization opportunities if stability is maintained.`,
@@ -307,22 +301,14 @@ export async function generateRecommendations(
 
       if (alternatives.length > 0) {
         const alt = alternatives[0];
+        const tierSavings = calculateAssumedCosts(currentFormularyDrug.tier, alt.tier);
         recommendations.push({
           rank: 2,
           type: alt.biosimilarOf ? 'SWITCH_TO_BIOSIMILAR' : 'SWITCH_TO_PREFERRED',
           drugName: alt.drugName,
           newDose: currentBiologic.dose,
           newFrequency: currentBiologic.frequency,
-          currentAnnualCost: currentFormularyDrug.annualCostWAC?.toNumber(),
-          recommendedAnnualCost: alt.annualCostWAC?.toNumber(),
-          annualSavings: currentFormularyDrug.annualCostWAC && alt.annualCostWAC
-            ? currentFormularyDrug.annualCostWAC.minus(alt.annualCostWAC).toNumber()
-            : undefined,
-          savingsPercent: currentFormularyDrug.annualCostWAC && alt.annualCostWAC
-            ? currentFormularyDrug.annualCostWAC.minus(alt.annualCostWAC).div(currentFormularyDrug.annualCostWAC).mul(100).toNumber()
-            : undefined,
-          currentMonthlyOOP: currentFormularyDrug.memberCopayT1?.div(12).toNumber(),
-          recommendedMonthlyOOP: alt.memberCopayT1?.div(12).toNumber(),
+          ...tierSavings,
           rationale: `Future consideration after ${monthsNeeded} more months of stability: Switch to ${alt.biosimilarOf ? 'biosimilar' : `Tier ${alt.tier} preferred agent`} to improve formulary alignment and reduce costs.`,
           evidenceSources: [],
           monitoringPlan: 'Consider this option once 6 months of sustained stability is achieved.',
@@ -339,18 +325,14 @@ export async function generateRecommendations(
       maxResults: 5
     });
 
+    const doseSavings = calculateAssumedCosts(currentFormularyDrug?.tier, currentFormularyDrug?.tier, 25);
     recommendations.push({
       rank: 3,
       type: 'DOSE_REDUCTION',
       drugName: currentBiologic.drugName,
       newDose: currentBiologic.dose,
       newFrequency: 'Extended interval (consider after sustained stability)',
-      currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-      recommendedAnnualCost: currentFormularyDrug?.annualCostWAC?.mul(0.75).toNumber(),
-      annualSavings: currentFormularyDrug?.annualCostWAC?.mul(0.25).toNumber(),
-      savingsPercent: 25,
-      currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-      recommendedMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).mul(0.75).toNumber(),
+      ...doseSavings,
       rationale: `Future consideration after ${monthsNeeded} more months of stability: Extended dosing intervals may maintain disease control while reducing costs once sustained stability (≥6 months) is confirmed.`,
       evidenceSources: doseReductionEvidence.map(e => e.title),
       monitoringPlan: 'Consider this option once 6 months of sustained stability is achieved.',
@@ -392,21 +374,12 @@ export async function generateRecommendations(
          drug.drugClass === currentFormularyDrug?.drugClass) &&
         drug.tier < currentTier
       )
-      .sort((a, b) => {
-        // Sort by tier first, then by cost savings
-        if (a.tier !== b.tier) return a.tier - b.tier;
-        const savingsA = currentFormularyDrug?.annualCostWAC && a.annualCostWAC
-          ? currentFormularyDrug.annualCostWAC.minus(a.annualCostWAC).toNumber()
-          : 0;
-        const savingsB = currentFormularyDrug?.annualCostWAC && b.annualCostWAC
-          ? currentFormularyDrug.annualCostWAC.minus(b.annualCostWAC).toNumber()
-          : 0;
-        return savingsB - savingsA; // Higher savings first
-      });
+      .sort((a, b) => a.tier - b.tier); // Sort by tier (lower tier = better)
 
     // Add switch recommendations (up to 2)
     for (const alt of alternatives.slice(0, 2)) {
       const contraCheck = checkContraindications(alt, patientWithFormulary.contraindications);
+      const tierSavings = calculateAssumedCosts(currentFormularyDrug?.tier, alt.tier);
 
       recommendations.push({
         rank: recommendations.length + 1,
@@ -414,16 +387,7 @@ export async function generateRecommendations(
         drugName: alt.drugName,
         newDose: currentBiologic.dose,
         newFrequency: currentBiologic.frequency,
-        currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-        recommendedAnnualCost: alt.annualCostWAC?.toNumber(),
-        annualSavings: currentFormularyDrug?.annualCostWAC && alt.annualCostWAC
-          ? currentFormularyDrug.annualCostWAC.minus(alt.annualCostWAC).toNumber()
-          : undefined,
-        savingsPercent: currentFormularyDrug?.annualCostWAC && alt.annualCostWAC
-          ? currentFormularyDrug.annualCostWAC.minus(alt.annualCostWAC).div(currentFormularyDrug.annualCostWAC).mul(100).toNumber()
-          : undefined,
-        currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-        recommendedMonthlyOOP: alt.memberCopayT1?.div(12).toNumber(),
+        ...tierSavings,
         rationale: alt.biosimilarOf
           ? `Patient is stable (DLQI ${assessment.dlqiScore}) for ${assessment.monthsStable} months. Switch to biosimilar maintains efficacy while reducing costs and improving formulary alignment.`
           : `Switch to Tier ${alt.tier} preferred agent maintains disease control while reducing costs and PA requirements.`,
@@ -444,18 +408,14 @@ export async function generateRecommendations(
         maxResults: 10
       });
 
+      const doseSavings = calculateAssumedCosts(currentFormularyDrug?.tier, currentFormularyDrug?.tier, 25);
       recommendations.push({
         rank: recommendations.length + 1,
         type: 'DOSE_REDUCTION',
         drugName: currentBiologic.drugName,
         newDose: currentBiologic.dose,
         newFrequency: 'Extended interval (discuss with provider)',
-        currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-        recommendedAnnualCost: currentFormularyDrug?.annualCostWAC?.mul(0.75).toNumber(),
-        annualSavings: currentFormularyDrug?.annualCostWAC?.mul(0.25).toNumber(),
-        savingsPercent: 25,
-        currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-        recommendedMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).mul(0.75).toNumber(),
+        ...doseSavings,
         rationale: `Alternative to switching: Patient stable (DLQI ${assessment.dlqiScore}) for ${assessment.monthsStable} months. Extended dosing may maintain control while reducing costs, though formulary switch offers greater savings.`,
         evidenceSources: doseReductionEvidence.map(e => e.title),
         monitoringPlan: 'Close monitoring required. Assess DLQI monthly for first 3 months. Be prepared to resume standard dosing if disease activity increases.',
@@ -473,12 +433,6 @@ export async function generateRecommendations(
         drugName: currentBiologic.drugName,
         newDose: currentBiologic.dose,
         newFrequency: currentBiologic.frequency,
-        currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-        recommendedAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-        annualSavings: 0,
-        savingsPercent: 0,
-        currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-        recommendedMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
         rationale: `Conservative option: Continue current therapy without changes. Patient has stable disease, and formulary switches carry some risk of disease flare that may be unacceptable to patient.`,
         evidenceSources: [],
         monitoringPlan: 'Monitor DLQI quarterly. Patient may prefer to maintain current stable regimen.',
@@ -499,18 +453,14 @@ export async function generateRecommendations(
     );
 
     // Option 1: Dose reduction (primary recommendation)
+    const doseSavings25 = calculateAssumedCosts(currentFormularyDrug?.tier, currentFormularyDrug?.tier, 25);
     recommendations.push({
       rank: 1,
       type: 'DOSE_REDUCTION',
       drugName: currentBiologic.drugName,
       newDose: currentBiologic.dose,
       newFrequency: 'Extended interval (discuss with provider)',
-      currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-      recommendedAnnualCost: currentFormularyDrug?.annualCostWAC?.mul(0.75).toNumber(), // Estimate 25% reduction
-      annualSavings: currentFormularyDrug?.annualCostWAC?.mul(0.25).toNumber(),
-      savingsPercent: 25,
-      currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-      recommendedMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).mul(0.75).toNumber(),
+      ...doseSavings25,
       rationale: `Patient has stable disease (DLQI ${assessment.dlqiScore}) for ${assessment.monthsStable} months on Tier 1 optimal medication. Extended dosing intervals may maintain disease control while reducing costs.`,
       evidenceSources: doseReductionEvidence.map(e => e.title),
       monitoringPlan: 'Close monitoring required. Assess DLQI monthly for first 3 months, then quarterly. Be prepared to resume standard dosing if disease activity increases.',
@@ -526,12 +476,6 @@ export async function generateRecommendations(
       drugName: currentBiologic.drugName,
       newDose: currentBiologic.dose,
       newFrequency: currentBiologic.frequency,
-      currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-      recommendedAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-      annualSavings: 0,
-      savingsPercent: 0,
-      currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-      recommendedMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
       rationale: `Conservative approach: Continue current Tier 1 therapy at standard dosing. Patient has excellent control and therapy is already formulary-optimal, minimizing risk of disease flare.`,
       evidenceSources: [],
       monitoringPlan: 'Monitor DLQI quarterly. Continue current therapy if patient and provider prefer maintaining status quo.',
@@ -549,22 +493,13 @@ export async function generateRecommendations(
 
     if (biosimilarAlternatives.length > 0) {
       const biosim = biosimilarAlternatives[0];
+      // Since both are Tier 1, savings come from potential cost differences within the tier
       recommendations.push({
         rank: 3,
         type: 'SWITCH_TO_BIOSIMILAR',
         drugName: biosim.drugName,
         newDose: currentBiologic.dose,
         newFrequency: currentBiologic.frequency,
-        currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-        recommendedAnnualCost: biosim.annualCostWAC?.toNumber(),
-        annualSavings: currentFormularyDrug?.annualCostWAC && biosim.annualCostWAC
-          ? currentFormularyDrug.annualCostWAC.minus(biosim.annualCostWAC).toNumber()
-          : undefined,
-        savingsPercent: currentFormularyDrug?.annualCostWAC && biosim.annualCostWAC
-          ? currentFormularyDrug.annualCostWAC.minus(biosim.annualCostWAC).div(currentFormularyDrug.annualCostWAC).mul(100).toNumber()
-          : undefined,
-        currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-        recommendedMonthlyOOP: biosim.memberCopayT1?.div(12).toNumber(),
         rationale: `Alternative option: Switch to Tier 1 biosimilar maintains disease control with equivalent efficacy while potentially reducing costs.`,
         evidenceSources: [],
         monitoringPlan: 'Assess DLQI at 3 and 6 months post-switch to ensure maintained control.',
@@ -574,18 +509,14 @@ export async function generateRecommendations(
       });
     } else {
       // If no biosimilar, offer more aggressive dose reduction
+      const doseSavings50 = calculateAssumedCosts(currentFormularyDrug?.tier, currentFormularyDrug?.tier, 50);
       recommendations.push({
         rank: 3,
         type: 'DOSE_REDUCTION',
         drugName: currentBiologic.drugName,
         newDose: currentBiologic.dose,
         newFrequency: 'More aggressive interval extension',
-        currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-        recommendedAnnualCost: currentFormularyDrug?.annualCostWAC?.mul(0.5).toNumber(), // 50% reduction
-        annualSavings: currentFormularyDrug?.annualCostWAC?.mul(0.5).toNumber(),
-        savingsPercent: 50,
-        currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-        recommendedMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).mul(0.5).toNumber(),
+        ...doseSavings50,
         rationale: `Alternative option: More aggressive dose reduction for sustained stable patients. Higher savings potential but requires closer monitoring and patient should be informed of increased flare risk.`,
         evidenceSources: doseReductionEvidence.map(e => e.title),
         monitoringPlan: 'Very close monitoring required. Assess DLQI every 2-4 weeks initially. Higher risk strategy - only for highly motivated, compliant patients.',
@@ -604,12 +535,6 @@ export async function generateRecommendations(
       drugName: currentBiologic.drugName,
       newDose: 'Verify adherence and optimize per label',
       newFrequency: currentBiologic.frequency,
-      currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-      recommendedAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-      annualSavings: 0,
-      savingsPercent: 0,
-      currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-      recommendedMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
       rationale: `Disease is not adequately controlled (DLQI ${assessment.dlqiScore}). Focus on adherence optimization and ensure proper dosing before considering therapy change.`,
       evidenceSources: [],
       monitoringPlan: 'Reassess adherence barriers. Consider patient education, auto-injector training. Re-evaluate in 12 weeks.',
@@ -625,12 +550,6 @@ export async function generateRecommendations(
       drugName: currentBiologic.drugName,
       newDose: currentBiologic.dose,
       newFrequency: currentBiologic.frequency,
-      currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-      recommendedAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-      annualSavings: 0,
-      savingsPercent: 0,
-      currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-      recommendedMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
       rationale: `Continue current Tier 1 therapy with close monitoring. Disease may be in temporary flare or control may not yet be established if recently started. Therapy is already formulary-optimal.`,
       evidenceSources: [],
       monitoringPlan: 'Monitor DLQI every 4 weeks. Allow adequate time for therapy to demonstrate full efficacy before considering switch.',
@@ -651,22 +570,14 @@ export async function generateRecommendations(
 
     if (alternativeMechanisms.length > 0) {
       const alt = alternativeMechanisms[0];
+      const tierSavings = calculateAssumedCosts(currentFormularyDrug?.tier, alt.tier);
       recommendations.push({
         rank: 3,
         type: 'THERAPEUTIC_SWITCH',
         drugName: alt.drugName,
         newDose: 'Per label',
         newFrequency: 'Per label',
-        currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-        recommendedAnnualCost: alt.annualCostWAC?.toNumber(),
-        annualSavings: currentFormularyDrug?.annualCostWAC && alt.annualCostWAC
-          ? currentFormularyDrug.annualCostWAC.minus(alt.annualCostWAC).toNumber()
-          : undefined,
-        savingsPercent: currentFormularyDrug?.annualCostWAC && alt.annualCostWAC
-          ? currentFormularyDrug.annualCostWAC.minus(alt.annualCostWAC).div(currentFormularyDrug.annualCostWAC).mul(100).toNumber()
-          : undefined,
-        currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-        recommendedMonthlyOOP: alt.memberCopayT1?.div(12).toNumber(),
+        ...tierSavings,
         rationale: `If adherence optimization fails: Consider switch to ${alt.drugClass.replace('_', ' ')} with different mechanism of action. May improve outcomes if current therapy is truly inadequate.`,
         evidenceSources: [],
         monitoringPlan: 'Only pursue if optimization attempts fail. Baseline labs if indicated. Assess response at 12-16 weeks.',
@@ -682,12 +593,6 @@ export async function generateRecommendations(
         drugName: currentBiologic.drugName,
         newDose: 'Consider adjunctive topical therapy',
         newFrequency: currentBiologic.frequency,
-        currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-        recommendedAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-        annualSavings: 0,
-        savingsPercent: 0,
-        currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-        recommendedMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
         rationale: `Consider adding adjunctive topical therapy or addressing comorbidities that may be impacting disease control while maintaining optimal biologic.`,
         evidenceSources: [],
         monitoringPlan: 'Re-evaluate need for systemic therapy change after optimizing adjunctive treatments.',
@@ -709,6 +614,7 @@ export async function generateRecommendations(
     // Add up to 3 alternatives
     for (const alt of alternatives.slice(0, 3)) {
       const contraCheck = checkContraindications(alt, patientWithFormulary.contraindications);
+      const tierSavings = calculateAssumedCosts(currentFormularyDrug?.tier, alt.tier);
 
       recommendations.push({
         rank: recommendations.length + 1,
@@ -716,16 +622,7 @@ export async function generateRecommendations(
         drugName: alt.drugName,
         newDose: 'Per label',
         newFrequency: 'Per label',
-        currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-        recommendedAnnualCost: alt.annualCostWAC?.toNumber(),
-        annualSavings: currentFormularyDrug?.annualCostWAC && alt.annualCostWAC
-          ? currentFormularyDrug.annualCostWAC.minus(alt.annualCostWAC).toNumber()
-          : undefined,
-        savingsPercent: currentFormularyDrug?.annualCostWAC && alt.annualCostWAC
-          ? currentFormularyDrug.annualCostWAC.minus(alt.annualCostWAC).div(currentFormularyDrug.annualCostWAC).mul(100).toNumber()
-          : undefined,
-        currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-        recommendedMonthlyOOP: alt.memberCopayT1?.div(12).toNumber(),
+        ...tierSavings,
         rationale: `Disease inadequately controlled on current non-preferred agent. Switch to formulary-preferred ${alt.drugClass.replace('_', ' ')} may improve outcomes and reduce costs.`,
         evidenceSources: [],
         monitoringPlan: 'Baseline labs if indicated. Assess response at 12-16 weeks based on drug pharmacokinetics.',
@@ -743,12 +640,6 @@ export async function generateRecommendations(
         drugName: currentBiologic.drugName,
         newDose: 'Optimize adherence before switching',
         newFrequency: currentBiologic.frequency,
-        currentAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-        recommendedAnnualCost: currentFormularyDrug?.annualCostWAC?.toNumber(),
-        annualSavings: 0,
-        savingsPercent: 0,
-        currentMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
-        recommendedMonthlyOOP: currentFormularyDrug?.memberCopayT1?.div(12).toNumber(),
         rationale: `Conservative option: Before switching medications, ensure adherence is optimized and adequate time given for current therapy to work.`,
         evidenceSources: [],
         monitoringPlan: 'Address adherence barriers. Re-evaluate in 8-12 weeks before pursuing medication switch.',
