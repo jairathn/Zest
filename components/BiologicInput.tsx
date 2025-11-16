@@ -69,10 +69,18 @@ export default function BiologicInput({
   }, [value.drugName, biologicOptions]);
 
   const handleBiologicSelect = (brand: string) => {
+    // Get the default (most common) dose and frequency for this biologic
+    const doses = getApprovedDoses(brand);
+    const frequencies = getStandardFrequencies(brand);
+
+    // Autofill with the first (most common) dose and frequency
+    const defaultDose = doses.length > 0 ? doses[0] : '';
+    const defaultFrequency = frequencies.length > 0 ? frequencies[0].label : '';
+
     onChange({
       drugName: brand,
-      dose: '',
-      frequency: '',
+      dose: defaultDose,
+      frequency: defaultFrequency,
     });
     setSearchTerm(brand);
     setShowDropdown(false);
