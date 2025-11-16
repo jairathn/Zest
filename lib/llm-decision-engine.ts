@@ -651,10 +651,17 @@ export async function generateLLMRecommendations(
   const currentBiologic = patient.currentBiologics[0];
   const hasCurrentBiologic = !!currentBiologic;
 
+  console.log(`\n━━━ FORMULARY MATCHING DEBUG ━━━`);
+  console.log(`Total formulary drugs available: ${patientWithFormulary.plan.formularyDrugs.length}`);
+  console.log(`Formulary drugs:`, patientWithFormulary.plan.formularyDrugs.map(d => `${d.drugName} (generic: ${d.genericName}, tier: ${d.tier})`));
+
   // Normalize drug name to generic (or null if not on biologic)
   const genericDrugName = currentBiologic
     ? await normalizeToGeneric(currentBiologic.drugName)
     : null;
+
+  console.log(`\nLooking for current biologic: "${currentBiologic?.drugName}"`);
+  console.log(`Normalized to generic: "${genericDrugName}"`);
 
   // Find current drug in formulary (match by brand name OR generic name)
   const currentFormularyDrug = currentBiologic
@@ -664,18 +671,34 @@ export async function generateLLMRecommendations(
           drug.genericName.toLowerCase() === genericDrugName.toLowerCase() ||
           drug.genericName.toLowerCase().startsWith(genericDrugName.toLowerCase() + '-') // biosimilar suffix
         );
+        console.log(`  Checking ${drug.drugName}: brandMatch=${brandMatch}, genericMatch=${genericMatch}`);
         return brandMatch || genericMatch;
       }) ?? null
     : null;
 
+  console.log(`Found current drug in formulary:`, currentFormularyDrug ? `YES - ${currentFormularyDrug.drugName} Tier ${currentFormularyDrug.tier}` : 'NO');
+  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+
   // Step 1: Determine quadrant using hard-coded rules (don't trust LLM for this)
-  const { isStable, isFormularyOptimal, quadrant } = determineQuadrantAndStatus(
+  const { isStable, isFormularyOptimal, quadrant} = determineQuadrantAndStatus(
     assessment.dlqiScore,
     assessment.monthsStable,
     currentFormularyDrug || null,
     hasCurrentBiologic
   );
-  console.log(`Quadrant determination: ${quadrant}, hasCurrentBiologic: ${hasCurrentBiologic}, isStable: ${isStable}, isFormularyOptimal: ${isFormularyOptimal}, Tier: ${currentFormularyDrug?.tier}`);
+  console.log(`━━━━━━ QUADRANT DETERMINATION DEBUG ━━━━━━`);
+  console.log(`Current biologic:`, currentBiologic?.drugName, currentBiologic?.dose, currentBiologic?.frequency);
+  console.log(`Generic drug name:`, genericDrugName);
+  console.log(`Current formulary drug found:`, currentFormularyDrug ? {
+    drugName: currentFormularyDrug.drugName,
+    genericName: currentFormularyDrug.genericName,
+    tier: currentFormularyDrug.tier,
+    requiresPA: currentFormularyDrug.requiresPA
+  } : 'NULL - NOT FOUND IN FORMULARY');
+  console.log(`Quadrant: ${quadrant}`);
+  console.log(`isStable: ${isStable} (DLQI: ${assessment.dlqiScore}, months: ${assessment.monthsStable})`);
+  console.log(`isFormularyOptimal: ${isFormularyOptimal} (Tier ${currentFormularyDrug?.tier}, PA: ${currentFormularyDrug?.requiresPA})`);
+  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
   // Step 2: Get LLM clinical reasoning
   const triage = await triagePatient(assessment, genericDrugName || 'None', currentFormularyDrug || null, quadrant);
