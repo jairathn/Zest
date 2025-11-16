@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 
 /**
  * Global navigation loading indicator
- * Shows a progress bar at the top of the page during navigation
+ * Shows a progress bar and spinner during navigation
  */
 export function NavigationProgress() {
   const pathname = usePathname();
@@ -16,10 +16,10 @@ export function NavigationProgress() {
     // Show loading when route changes
     setLoading(true);
 
-    // Hide loading after a short delay (navigation has completed)
+    // Hide loading after navigation completes
     const timer = setTimeout(() => {
       setLoading(false);
-    }, 200);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [pathname, searchParams]);
@@ -27,14 +27,35 @@ export function NavigationProgress() {
   if (!loading) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50">
-      <div className="h-1 bg-blue-600 animate-pulse"
+    <>
+      {/* Progress bar at top */}
+      <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-blue-600 animate-pulse"
            style={{
-             animation: 'progress 1s ease-in-out infinite',
-             background: 'linear-gradient(90deg, #3b82f6 0%, #60a5fa 50%, #3b82f6 100%)',
-             backgroundSize: '200% 100%'
+             animation: 'indeterminate-progress 1.5s ease-in-out infinite',
+             background: 'linear-gradient(90deg, transparent, #3b82f6, transparent)',
+             backgroundSize: '50% 100%',
            }}
       />
-    </div>
+
+      {/* Overlay with spinner */}
+      <div className="fixed inset-0 z-40 bg-white/50 backdrop-blur-sm flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          {/* Spinner */}
+          <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <p className="text-sm font-medium text-gray-700">Loading...</p>
+        </div>
+      </div>
+
+      <style jsx>{`
+        @keyframes indeterminate-progress {
+          0% {
+            background-position: -50% 0;
+          }
+          100% {
+            background-position: 150% 0;
+          }
+        }
+      `}</style>
+    </>
   );
 }

@@ -41,10 +41,14 @@ export default function DeletePatientButton({ patientId, patientName }: Props) {
     <button
       onClick={handleDelete}
       disabled={deleting}
-      className="text-red-600 hover:text-red-900 disabled:opacity-50"
-      title="Delete patient"
+      className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-wait inline-flex items-center"
+      title={deleting ? "Deleting..." : "Delete patient"}
     >
-      <Trash2 className="w-4 h-4" />
+      {deleting ? (
+        <div className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+      ) : (
+        <Trash2 className="w-4 h-4" />
+      )}
     </button>
   );
 }

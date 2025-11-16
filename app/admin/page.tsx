@@ -31,6 +31,7 @@ export default function AdminPage() {
   const [creatingNewPlan, setCreatingNewPlan] = useState(false);
   const [newPlanName, setNewPlanName] = useState('');
   const [newPayerName, setNewPayerName] = useState('');
+  const [submittingModal, setSubmittingModal] = useState(false);
 
   useEffect(() => {
     loadInsurancePlans();
@@ -63,6 +64,7 @@ export default function AdminPage() {
   const handleModalSubmit = async () => {
     if (!pendingUpload) return;
 
+    setSubmittingModal(true);
     let planId = selectedPlanId;
 
     // Create new plan if needed
@@ -81,11 +83,13 @@ export default function AdminPage() {
         await loadInsurancePlans();
       } catch (error) {
         alert('Failed to create new insurance plan');
+        setSubmittingModal(false);
         return;
       }
     }
 
     setShowModal(false);
+    setSubmittingModal(false);
     handleUpload(pendingUpload.type, pendingUpload.files, datasetLabel, planId);
     setPendingUpload(null);
   };
@@ -441,6 +445,7 @@ export default function AdminPage() {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
+                disabled={submittingModal}
                 className="btn btn-secondary flex-1"
               >
                 Cancel
@@ -448,10 +453,17 @@ export default function AdminPage() {
               <button
                 type="button"
                 onClick={handleModalSubmit}
-                disabled={!datasetLabel || (pendingUpload.type === 'formulary' && !selectedPlanId && !creatingNewPlan)}
-                className="btn btn-primary flex-1"
+                disabled={submittingModal || !datasetLabel || (pendingUpload.type === 'formulary' && !selectedPlanId && !creatingNewPlan)}
+                className="btn btn-primary flex-1 disabled:cursor-wait inline-flex items-center justify-center"
               >
-                Upload
+                {submittingModal ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                    Processing...
+                  </>
+                ) : (
+                  'Upload'
+                )}
               </button>
             </div>
           </div>
