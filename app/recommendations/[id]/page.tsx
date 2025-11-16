@@ -36,6 +36,43 @@ export default async function RecommendationsPage({ params }: PageProps) {
     notFound();
   }
 
+  // Resolve formulary drugs (same logic as decision engine)
+  // If patient has formularyPlanName but no linked plan, look up the plan by name
+  let effectivePlanId = assessment.patient.planId;
+  if (!effectivePlanId && assessment.patient.formularyPlanName) {
+    const planByName = await prisma.insurancePlan.findFirst({
+      where: { planName: assessment.patient.formularyPlanName },
+    });
+    if (planByName) {
+      effectivePlanId = planByName.id;
+    }
+  }
+
+  // Fetch formulary drugs from the most recent upload for the effective plan
+  const mostRecentUpload = effectivePlanId
+    ? await prisma.uploadLog.findFirst({
+        where: {
+          uploadType: 'FORMULARY',
+          planId: effectivePlanId,
+        },
+        orderBy: { uploadedAt: 'desc' },
+        select: { id: true },
+      })
+    : null;
+
+  const fetchedFormularyDrugs = mostRecentUpload && effectivePlanId
+    ? await prisma.formularyDrug.findMany({
+        where: {
+          planId: effectivePlanId,
+          uploadLogId: mostRecentUpload.id,
+        },
+        orderBy: [
+          { tier: 'asc' },
+          { requiresPA: 'asc' },
+        ],
+      })
+    : [];
+
   // Filter out contraindicated drugs from formulary reference
   const filterContraindicated = (drugs: any[], contraindications: any[]) => {
     if (contraindications.length === 0) return drugs;
@@ -76,9 +113,9 @@ export default async function RecommendationsPage({ params }: PageProps) {
   };
 
   // Get safe formulary drugs (filtered for diagnosis AND contraindications)
-  const formularyDrugs = assessment.patient.plan?.formularyDrugs || [];
+  // Use fetchedFormularyDrugs from the plan resolution above
   const diagnosisAppropriateDrugs = filterByDiagnosis(
-    formularyDrugs,
+    fetchedFormularyDrugs,
     assessment.diagnosis
   );
   const safeFormularyDrugs = filterContraindicated(
@@ -103,7 +140,7 @@ export default async function RecommendationsPage({ params }: PageProps) {
 
   // Find current drug's tier from formulary
   const currentDrugTier = currentBiologic
-    ? formularyDrugs.find(
+    ? fetchedFormularyDrugs.find(
         drug => drug.drugName.toLowerCase() === currentBiologic.drugName.toLowerCase()
       )?.tier
     : undefined;
@@ -396,6 +433,9 @@ export default async function RecommendationsPage({ params }: PageProps) {
                       Tier
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Prior Auth
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Restrictions
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -435,6 +475,17 @@ export default async function RecommendationsPage({ params }: PageProps) {
                         }`}>
                           Tier {drug.tier}{drug.tier === 5 ? ' (Not Covered)' : ''}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        {drug.requiresPA === 'Yes' ? (
+                          <span className="px-2 py-1 rounded bg-amber-100 text-amber-800 text-xs font-medium">
+                            Yes
+                          </span>
+                        ) : drug.requiresPA === 'No' ? (
+                          <span className="text-gray-500 text-xs">No</span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">{drug.requiresPA || '-'}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {drug.restrictions || '-'}
