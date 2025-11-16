@@ -298,7 +298,7 @@ async function retrieveRelevantEvidenceFallback(
 }
 
 /**
- * Filter drugs by approved indications for the patient's diagnosis
+ * Filter drugs by FDA approved indications for the patient's diagnosis
  */
 function filterByDiagnosis(
   drugs: FormularyDrug[],
@@ -306,11 +306,11 @@ function filterByDiagnosis(
 ): FormularyDrug[] {
   return drugs.filter(drug => {
     // If no indications specified, include it (for backward compatibility)
-    if (!drug.approvedIndications || drug.approvedIndications.length === 0) {
+    if (!drug.fdaIndications || drug.fdaIndications.length === 0) {
       return true;
     }
-    // Check if the diagnosis is in the approved indications list
-    return drug.approvedIndications.includes(diagnosis);
+    // Check if the diagnosis is in the FDA indications list
+    return drug.fdaIndications.includes(diagnosis);
   });
 }
 

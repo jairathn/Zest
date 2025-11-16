@@ -103,9 +103,10 @@ export default async function RecommendationsPage({ params }: PageProps) {
   // Filter drugs by diagnosis indication
   const filterByDiagnosis = (drugs: any[], diagnosis: string) => {
     return drugs.filter(drug => {
-      // If no indications specified, exclude it (should have indications by now)
+      // If no indications specified, include it (for backward compatibility)
+      // Only filter OUT if indications are specified AND diagnosis not included
       if (!drug.fdaIndications || drug.fdaIndications.length === 0) {
-        return false;
+        return true; // Include drugs without FDA indications data
       }
       // Check if the diagnosis is in the FDA indications list
       return drug.fdaIndications.includes(diagnosis);
