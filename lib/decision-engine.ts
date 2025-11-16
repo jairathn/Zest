@@ -46,9 +46,59 @@ export interface RecommendationOutput {
   evidenceSources: string[];
   monitoringPlan?: string;
   tier?: number;
-  requiresPA?: boolean;
+  requiresPA?: string | boolean;
   contraindicated: boolean;
   contraindicationReason?: string;
+}
+
+/**
+ * Calculate assumed costs based on tier (since we don't have actual cost data)
+ * Returns null if we cannot make assumptions
+ */
+export function calculateAssumedCosts(
+  currentTier: number | undefined,
+  recommendedTier: number | undefined,
+  doseReductionPercent?: number
+): {
+  currentAnnualCost?: number;
+  recommendedAnnualCost?: number;
+  annualSavings?: number;
+  savingsPercent?: number;
+} | null {
+  // For tier-based switching
+  if (currentTier && recommendedTier && currentTier > recommendedTier) {
+    // Assume significant savings for tier reduction
+    // Tier 1 = ~$50k, Tier 2 = ~$70k, Tier 3 = ~$90k, Tier 4 = ~$100k (rough estimates)
+    const tierCosts = { 1: 50000, 2: 70000, 3: 90000, 4: 100000, 5: 0 };
+    const currentCost = tierCosts[currentTier as keyof typeof tierCosts] || 80000;
+    const recommendedCost = tierCosts[recommendedTier as keyof typeof tierCosts] || 50000;
+    const savings = currentCost - recommendedCost;
+    const savingsPercent = (savings / currentCost) * 100;
+
+    return {
+      currentAnnualCost: currentCost,
+      recommendedAnnualCost: recommendedCost,
+      annualSavings: savings,
+      savingsPercent: savingsPercent,
+    };
+  }
+
+  // For dose reduction
+  if (doseReductionPercent && currentTier) {
+    const tierCosts = { 1: 50000, 2: 70000, 3: 90000, 4: 100000, 5: 0 };
+    const currentCost = tierCosts[currentTier as keyof typeof tierCosts] || 80000;
+    const recommendedCost = currentCost * (1 - doseReductionPercent / 100);
+    const savings = currentCost - recommendedCost;
+
+    return {
+      currentAnnualCost: currentCost,
+      recommendedAnnualCost: recommendedCost,
+      annualSavings: savings,
+      savingsPercent: doseReductionPercent,
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -81,7 +131,8 @@ export function determineFormularyStatus(
   if (!currentDrug) return false;
   // Optimal ONLY if Tier 1 and no PA required
   // Tier 2-3 are always suboptimal (cost optimization opportunities exist)
-  return currentDrug.tier === 1 && !currentDrug.requiresPA;
+  const paRequired = currentDrug.requiresPA && currentDrug.requiresPA !== 'No' && currentDrug.requiresPA !== 'N/A';
+  return currentDrug.tier === 1 && !paRequired;
 }
 
 /**
@@ -102,12 +153,12 @@ export function isDrugIndicatedForDiagnosis(
   diagnosis: DiagnosisType
 ): boolean {
   // If no indications specified, assume it's available for all (for backward compatibility)
-  if (!drug.approvedIndications || drug.approvedIndications.length === 0) {
+  if (!drug.fdaIndications || drug.fdaIndications.length === 0) {
     return true;
   }
 
-  // Check if the diagnosis is in the approved indications list
-  return drug.approvedIndications.includes(diagnosis);
+  // Check if the diagnosis is in the FDA indications list
+  return drug.fdaIndications.includes(diagnosis);
 }
 
 /**
@@ -121,7 +172,7 @@ export function checkContraindications(
   const contraindicationTypes = contraindications.map(c => c.type);
 
   // TNF inhibitors contraindicated in heart failure and MS
-  if (drug.drugClass === 'TNF_INHIBITOR') {
+  if (drug.drugClass && drug.drugClass.includes('TNF')) {
     if (contraindicationTypes.includes('HEART_FAILURE')) {
       return { contraindicated: true, reason: 'TNF inhibitors contraindicated in heart failure' };
     }

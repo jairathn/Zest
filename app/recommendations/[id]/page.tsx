@@ -44,13 +44,13 @@ export default async function RecommendationsPage({ params }: PageProps) {
 
     return drugs.filter(drug => {
       // TNF inhibitors contraindicated in CHF and MS
-      if (drug.drugClass === 'TNF_INHIBITOR') {
+      if (drug.drugClass && drug.drugClass.includes('TNF')) {
         if (contraindicationTypes.includes('HEART_FAILURE')) return false;
         if (contraindicationTypes.includes('MULTIPLE_SCLEROSIS')) return false;
       }
 
       // IL-17 inhibitors can worsen IBD
-      if (drug.drugClass === 'IL17_INHIBITOR') {
+      if (drug.drugClass && drug.drugClass.includes('IL-17')) {
         if (contraindicationTypes.includes('INFLAMMATORY_BOWEL_DISEASE')) return false;
       }
 
@@ -67,11 +67,11 @@ export default async function RecommendationsPage({ params }: PageProps) {
   const filterByDiagnosis = (drugs: any[], diagnosis: string) => {
     return drugs.filter(drug => {
       // If no indications specified, exclude it (should have indications by now)
-      if (!drug.approvedIndications || drug.approvedIndications.length === 0) {
+      if (!drug.fdaIndications || drug.fdaIndications.length === 0) {
         return false;
       }
-      // Check if the diagnosis is in the approved indications list
-      return drug.approvedIndications.includes(diagnosis);
+      // Check if the diagnosis is in the FDA indications list
+      return drug.fdaIndications.includes(diagnosis);
     });
   };
 
@@ -210,7 +210,7 @@ export default async function RecommendationsPage({ params }: PageProps) {
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
                       {rec.type.replace(/_/g, ' ')} • Tier {rec.tier || 'N/A'}
-                      {rec.requiresPA && ' • PA Required'}
+                      {rec.requiresPA && rec.requiresPA !== 'No' && ` • PA: ${rec.requiresPA}`}
                     </p>
                   </div>
                 </div>
@@ -380,51 +380,66 @@ export default async function RecommendationsPage({ params }: PageProps) {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Brand Name
+                      Drug Name
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Generic Name
+                      Formulation
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Drug Class
+                      Strength
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      NDC
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Tier
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      PA Required
+                      Restrictions
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Annual Cost (WAC)
+                      Quantity Limit
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {safeFormularyDrugs.map((drug, idx) => (
-                    <tr key={idx} className={drug.tier === 1 ? 'bg-green-50' : drug.tier === 2 ? 'bg-yellow-50' : ''}>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {drug.drugName}
+                    <tr key={idx} className={
+                      drug.tier === 1 ? 'bg-green-50' :
+                      drug.tier === 2 ? 'bg-yellow-50' :
+                      drug.tier === 5 ? 'bg-red-100' : ''
+                    }>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="font-medium text-gray-900">{drug.drugName}</div>
+                        <div className="text-xs text-gray-500">{drug.genericName}</div>
+                        <div className="text-xs text-gray-500 mt-1">{drug.drugClass}</div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                        {drug.genericName || drug.drugName}
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {drug.formulation || '-'}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                        {drug.drugClass.replace(/_/g, ' ')}
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {drug.strength || '-'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-600">
+                        {drug.ndcCode || '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           drug.tier === 1 ? 'bg-green-100 text-green-800' :
                           drug.tier === 2 ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
+                          drug.tier === 3 ? 'bg-orange-100 text-orange-800' :
+                          drug.tier === 4 ? 'bg-red-100 text-red-800' :
+                          drug.tier === 5 ? 'bg-gray-100 text-gray-800' :
+                          'bg-gray-100 text-gray-600'
                         }`}>
-                          Tier {drug.tier}
+                          Tier {drug.tier}{drug.tier === 5 ? ' (Not Covered)' : ''}
                         </span>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                        {drug.requiresPA ? 'Yes' : 'No'}
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {drug.restrictions || '-'}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                        {formatCurrency(drug.annualCostWAC?.toNumber())}
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {drug.quantityLimit || '-'}
                       </td>
                     </tr>
                   ))}

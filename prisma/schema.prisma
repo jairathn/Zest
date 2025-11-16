@@ -9,16 +9,6 @@ datasource db {
   extensions = [vector]
 }
 
-enum DrugClass {
-  TNF_INHIBITOR
-  IL17_INHIBITOR
-  IL23_INHIBITOR
-  IL4_13_INHIBITOR
-  IL12_23_INHIBITOR
-  JAK_INHIBITOR
-  OTHER
-}
-
 enum DiagnosisType {
   PSORIASIS
   ATOPIC_DERMATITIS
@@ -126,18 +116,34 @@ model FormularyDrug {
   id                  String    @id @default(cuid())
   planId              String
   uploadLogId         String?   // Links to dataset upload
+
+  // Core drug identification
   drugName            String
   genericName         String
-  drugClass           DrugClass
-  tier                Int
-  requiresPA          Boolean   @default(false)
+  drugClass           String    // Changed from enum to String for flexibility
+
+  // Formulation details (NEW - from real-world data)
+  formulation         String?   // e.g., "2 Pen Kit", "Prefilled Syringe", "Tablet"
+  strength            String?   // e.g., "40MG/0.8ML Subcutaneous", "300MG Dose Subcutaneous"
+
+  // Formulary tier and coverage
+  tier                Int       // 1-5, where 5 = Not Covered
+
+  // Prior Authorization and Restrictions (UPDATED)
+  requiresPA          String?   // "Yes", "No", "N/A", "Unknown"
   stepTherapyRequired Boolean   @default(false)
-  annualCostWAC       Decimal?  @db.Decimal(12, 2)
-  memberCopayT1       Decimal?  @db.Decimal(10, 2)
-  memberCopayT2       Decimal?  @db.Decimal(10, 2)
-  memberCopayT3       Decimal?  @db.Decimal(10, 2)
+  restrictions        String?   // e.g., "PA; DL; QL", "B/D; PA" (raw text from formulary)
+  quantityLimit       String?   // e.g., "Max 4 pens per 28 days"
+
+  // Biosimilar relationship
   biosimilarOf        String?
-  approvedIndications String[]  @default([])
+
+  // FDA approved indications (NEW)
+  fdaIndications      String[]  @default([])  // e.g., ["Psoriasis", "PsA", "HS"]
+
+  // NDC Code (NEW - will be populated)
+  ndcCode             String?
+
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -146,6 +152,10 @@ model FormularyDrug {
 
   @@index([planId, drugName])
   @@index([drugName])
+  @@index([genericName])
+  @@index([drugClass])
+  @@index([tier])
+  @@index([ndcCode])
   @@index([uploadLogId])
 }
 
@@ -374,16 +384,18 @@ model UploadLog {
 
 // New table to handle NDC -> Drug Name conversion
 model NdcMapping {
-  id          String    @id @default(cuid())
-  ndcCode     String    @unique
+  id          String   @id @default(cuid())
+  ndcCode     String   @unique
   drugName    String
   genericName String?
-  drugClass   DrugClass?
+  drugClass   String?  // Changed from enum to String
   strength    String?
   dosageForm  String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  formulation String?  // Added to match FormularyDrug
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([ndcCode])
   @@index([drugName])
+  @@index([genericName])
 }
