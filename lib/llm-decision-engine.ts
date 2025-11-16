@@ -90,7 +90,7 @@ function determineQuadrantAndStatus(
   // Check for stable but insufficient duration - special case
   if (isStableShortDuration(dlqiScore, monthsStable)) {
     const isFormularyOptimal = currentFormularyDrug
-      ? (currentFormularyDrug.tier === 1 && currentFormularyDrug.requiresPA !== 'Yes')
+      ? currentFormularyDrug.tier === 1
       : false;
     return {
       isStable: true, // Patient IS stable, just not for long enough
@@ -102,10 +102,10 @@ function determineQuadrantAndStatus(
   // Stability: DLQI ≤1 (no effect on life) and ≥6 months stable
   const isStable = dlqiScore <= 1 && monthsStable >= 6;
 
-  // Formulary optimal: ONLY Tier 1 without PA
-  // Tier 2-5 = suboptimal even if "aligned"
+  // Formulary optimal: Tier 1 (PA status is administrative, not clinical quality indicator)
+  // Tier 2-5 = suboptimal
   const isFormularyOptimal = currentFormularyDrug
-    ? (currentFormularyDrug.tier === 1 && currentFormularyDrug.requiresPA !== 'Yes')
+    ? currentFormularyDrug.tier === 1
     : false;
 
   // Determine quadrant
@@ -150,7 +150,7 @@ Formulary Status:
 The patient has been classified as: ${quadrant}
 - not_on_biologic: Patient needs biologic initiation → Recommend best Tier 1 option
 - stable_short_duration: Patient is stable (DLQI ≤1) but for <6 months → Continue current therapy, re-evaluate after sufficient time
-- stable_optimal: Stable + Tier 1 without PA → Consider dose reduction OR within-tier optimization
+- stable_optimal: Stable + Tier 1 → Consider dose reduction OR within-tier optimization
 - stable_suboptimal: Stable + Tier 2-5 → MUST recommend switch to Tier 1
 - unstable_optimal: Unstable + Tier 1 → Consider different Tier 1 option or optimize current
 - unstable_suboptimal: Unstable + Tier 2-5 → ⚠️ MUST recommend switch to Tier 1 (NEVER just continue or optimize current)
