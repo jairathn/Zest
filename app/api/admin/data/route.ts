@@ -248,14 +248,17 @@ async function handleViewDataset(type: string | null, id: string) {
         // Generate CSV headers
         const claimsHeaders = [
           'Patient ID',
+          'Pharmacy Insurance ID',
           'Patient Name',
           'Drug Name',
           'NDC Code',
           'Fill Date',
           'Days Supply',
           'Quantity',
-          'Out of Pocket',
+          'Diagnosis Code',
+          'Out of Pocket (Member Paid)',
           'Plan Paid',
+          'True Drug Cost',
         ];
 
         csvData = claimsHeaders.join(',') + '\n';
@@ -264,14 +267,17 @@ async function handleViewDataset(type: string | null, id: string) {
         claims.forEach(claim => {
           const row = [
             claim.patient.externalId || '',
+            claim.patient.pharmacyInsuranceId || '',
             `"${claim.patient.firstName} ${claim.patient.lastName}"`,
-            `"${claim.drugName}"`,
+            claim.drugName ? `"${claim.drugName}"` : '',
             claim.ndcCode || '',
             claim.fillDate.toISOString().split('T')[0],
-            claim.daysSupply,
-            claim.quantity,
+            claim.daysSupply?.toString() || '',
+            claim.quantity?.toString() || '',
+            claim.diagnosisCode || '',
             claim.outOfPocket?.toString() || '',
             claim.planPaid?.toString() || '',
+            claim.trueDrugCost?.toString() || '',
           ];
           csvData += row.join(',') + '\n';
         });

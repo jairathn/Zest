@@ -55,6 +55,11 @@ enum DecisionStatus {
   MODIFIED
 }
 
+enum CostDesignation {
+  LOW_COST
+  HIGH_COST
+}
+
 // ============================================
 // CORE ENTITIES
 // ============================================
@@ -74,21 +79,47 @@ model InsurancePlan {
 }
 
 model Patient {
-  id            String    @id @default(cuid())
-  externalId    String?   @unique
-  firstName     String
-  lastName      String
-  dateOfBirth   DateTime
-  planId        String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                    String             @id @default(cuid())
+  externalId            String?            @unique  // For "Patient ID" format
+  pharmacyInsuranceId   String?            @unique  // PRIMARY LINKING FIELD - from test data
+  firstName             String
+  lastName              String
+  dateOfBirth           DateTime
 
-  plan              InsurancePlan      @relation(fields: [planId], references: [id])
-  currentBiologics  CurrentBiologic[]
-  claims            PharmacyClaim[]
-  contraindications Contraindication[]
-  assessments       Assessment[]
-  recommendations   Recommendation[]
+  // Address fields (from test eligibility data)
+  streetAddress         String?
+  city                  String?
+  state                 String?
+
+  // Employment & Contact (from test eligibility data)
+  employer              String?
+  email                 String?
+  phone                 String?
+
+  // Eligibility dates (from test eligibility data)
+  eligibilityStartDate  DateTime?
+  eligibilityEndDate    DateTime?
+
+  // Cost tracking (from test eligibility data)
+  costDesignation       CostDesignation?
+  benchmarkCost         Decimal?           @db.Decimal(12, 2)
+
+  // Plan reference (can be null if formulary is just a string)
+  planId                String?
+  formularyPlanName     String?            // For when plan is just a string like "Aetna December 2024"
+
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  plan                  InsurancePlan?     @relation(fields: [planId], references: [id])
+  currentBiologics      CurrentBiologic[]
+  claims                PharmacyClaim[]
+  contraindications     Contraindication[]
+  assessments           Assessment[]
+  recommendations       Recommendation[]
+
+  @@index([pharmacyInsuranceId])
+  @@index([externalId])
 }
 
 model FormularyDrug {
@@ -139,13 +170,24 @@ model PharmacyClaim {
   id          String   @id @default(cuid())
   patientId   String
   uploadLogId String?  // Links to dataset upload
-  drugName    String
+
+  // Drug identification - can have drugName OR ndcCode OR both
+  drugName    String?
   ndcCode     String?
+
+  // Fill details
   fillDate    DateTime
-  daysSupply  Int
-  quantity    Int
-  outOfPocket Decimal? @db.Decimal(10, 2)
-  planPaid    Decimal? @db.Decimal(12, 2)
+  daysSupply  Int?
+  quantity    Int?
+
+  // Diagnosis (from test claims data)
+  diagnosisCode String?  // ICD-10 code like "L40.0", "L20.9"
+
+  // Cost breakdown
+  outOfPocket  Decimal? @db.Decimal(10, 2)  // Member Paid / Out of Pocket
+  planPaid     Decimal? @db.Decimal(12, 2)  // Plan Paid
+  trueDrugCost Decimal? @db.Decimal(12, 2)  // True Drug Cost (net of rebate when available)
+
   createdAt   DateTime @default(now())
 
   patient   Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
@@ -153,6 +195,8 @@ model PharmacyClaim {
 
   @@index([patientId, fillDate])
   @@index([drugName])
+  @@index([ndcCode])
+  @@index([diagnosisCode])
   @@index([uploadLogId])
 }
 
@@ -322,4 +366,24 @@ model UploadLog {
 
   @@index([uploadType, uploadedAt])
   @@index([planId])
+}
+
+// ============================================
+// NDC TO DRUG NAME MAPPING
+// ============================================
+
+// New table to handle NDC -> Drug Name conversion
+model NdcMapping {
+  id          String    @id @default(cuid())
+  ndcCode     String    @unique
+  drugName    String
+  genericName String?
+  drugClass   DrugClass?
+  strength    String?
+  dosageForm  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([ndcCode])
+  @@index([drugName])
 }

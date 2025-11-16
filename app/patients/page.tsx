@@ -35,8 +35,10 @@ export default async function PatientsPage() {
               <tr className="border-b">
                 <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Patient</th>
                 <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">ID</th>
+                <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Location</th>
                 <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Plan</th>
                 <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Current Biologic</th>
+                <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Cost Tier</th>
                 <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Last Assessment</th>
                 <th className="text-right py-3 px-4 font-semibold text-sm text-gray-700">Actions</th>
               </tr>
@@ -64,10 +66,21 @@ export default async function PatientsPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-600">
-                      {patient.externalId || '—'}
+                      {patient.externalId || patient.pharmacyInsuranceId || '—'}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-600">
-                      {patient.plan.planName}
+                      {patient.city && patient.state ? (
+                        <div>
+                          <div>{patient.city}, {patient.state}</div>
+                        </div>
+                      ) : patient.state ? (
+                        patient.state
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-600">
+                      {patient.plan?.planName || patient.formularyPlanName || '—'}
                     </td>
                     <td className="py-3 px-4">
                       {biologic ? (
@@ -79,6 +92,19 @@ export default async function PatientsPage() {
                         </div>
                       ) : (
                         <span className="text-sm text-gray-400">None</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      {patient.costDesignation ? (
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          patient.costDesignation === 'HIGH_COST'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {patient.costDesignation === 'HIGH_COST' ? 'High Cost' : 'Low Cost'}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-400">—</span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-600">

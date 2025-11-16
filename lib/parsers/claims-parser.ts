@@ -15,13 +15,16 @@ type ClaimRow = z.infer<typeof claimSchema>;
 
 const columnMappings = {
   patientId: ['patient id', 'patientid', 'patient_id', 'member id', 'memberid', 'external id', 'externalid'],
+  pharmacyInsuranceId: ['pharmacy insurance id', 'pharmacyinsuranceid', 'pharmacy_insurance_id', 'insurance id', 'insuranceid'],
   drugName: ['drug name', 'drugname', 'drug', 'medication', 'product'],
   ndcCode: ['ndc', 'ndc code', 'ndc_code', 'ndccode'],
   fillDate: ['fill date', 'filldate', 'fill_date', 'date', 'service date'],
   daysSupply: ['days supply', 'dayssupply', 'days_supply', 'supply'],
   quantity: ['quantity', 'qty', 'amount'],
-  outOfPocket: ['out of pocket', 'oop', 'out_of_pocket', 'patient paid', 'copay'],
-  planPaid: ['plan paid', 'planpaid', 'plan_paid', 'insurance paid', 'payer paid'],
+  diagnosisCode: ['diagnosis code', 'diagnosiscode', 'diagnosis_code', 'dx code', 'icd10', 'icd-10'],
+  outOfPocket: ['out of pocket', 'oop', 'out_of_pocket', 'patient paid', 'copay', 'member paid', 'cost (member paid)'],
+  planPaid: ['plan paid', 'planpaid', 'plan_paid', 'insurance paid', 'payer paid', 'cost (plan paid)'],
+  trueDrugCost: ['true drug cost', 'truedrug cost', 'true_drug_cost', 'net cost', 'cost (true drug cost)', 'actual cost'],
 };
 
 function normalizeColumnName(col: string): string {
@@ -69,11 +72,22 @@ export function parseClaimsCSV(data: any[]): {
   const headers = Object.keys(data[0]);
   const columnMap = mapColumns(headers);
 
-  const required = ['patientId', 'drugName', 'fillDate'];
+  // Required: fill date and at least one patient identifier
+  const required = ['fillDate'];
   for (const field of required) {
     if (!columnMap.has(field)) {
       return { rows: [], errors: [{ row: 0, error: `Required column "${field}" not found` }] };
     }
+  }
+
+  // Check that we have at least one patient identifier
+  if (!columnMap.has('patientId') && !columnMap.has('pharmacyInsuranceId')) {
+    return { rows: [], errors: [{ row: 0, error: 'CSV must include either "Patient ID" or "Pharmacy Insurance ID" column' }] };
+  }
+
+  // Check that we have at least one drug identifier
+  if (!columnMap.has('drugName') && !columnMap.has('ndcCode')) {
+    return { rows: [], errors: [{ row: 0, error: 'CSV must include either "Drug Name" or "NDC Code" column' }] };
   }
 
   const parsedRows: any[] = [];
@@ -84,15 +98,61 @@ export function parseClaimsCSV(data: any[]): {
 
     try {
       const parsed: any = {
-        patientId: String(row[columnMap.get('patientId')!]).trim(),
-        drugName: String(row[columnMap.get('drugName')!]).trim(),
-        ndcCode: columnMap.has('ndcCode') ? String(row[columnMap.get('ndcCode')!]).trim() : null,
         fillDate: parseDate(row[columnMap.get('fillDate')!]),
-        daysSupply: parseNumber(columnMap.has('daysSupply') ? row[columnMap.get('daysSupply')!] : 90) ?? 90,
-        quantity: parseNumber(columnMap.has('quantity') ? row[columnMap.get('quantity')!] : 1) ?? 1,
-        outOfPocket: parseNumber(columnMap.has('outOfPocket') ? row[columnMap.get('outOfPocket')!] : undefined),
-        planPaid: parseNumber(columnMap.has('planPaid') ? row[columnMap.get('planPaid')!] : undefined),
       };
+
+      // Patient identifiers (at least one required)
+      if (columnMap.has('patientId')) {
+        const patientId = String(row[columnMap.get('patientId')!] || '').trim();
+        if (patientId) parsed.patientId = patientId;
+      }
+
+      if (columnMap.has('pharmacyInsuranceId')) {
+        const pharmacyInsuranceId = String(row[columnMap.get('pharmacyInsuranceId')!] || '').trim();
+        if (pharmacyInsuranceId) parsed.pharmacyInsuranceId = pharmacyInsuranceId;
+      }
+
+      // Drug identifiers (at least one required)
+      if (columnMap.has('drugName')) {
+        const drugName = String(row[columnMap.get('drugName')!] || '').trim();
+        if (drugName) parsed.drugName = drugName;
+      }
+
+      if (columnMap.has('ndcCode')) {
+        const ndcCode = String(row[columnMap.get('ndcCode')!] || '').trim();
+        if (ndcCode) parsed.ndcCode = ndcCode;
+      }
+
+      // Optional fields
+      if (columnMap.has('daysSupply')) {
+        const daysSupply = parseNumber(row[columnMap.get('daysSupply')!]);
+        if (daysSupply !== undefined) parsed.daysSupply = daysSupply;
+      }
+
+      if (columnMap.has('quantity')) {
+        const quantity = parseNumber(row[columnMap.get('quantity')!]);
+        if (quantity !== undefined) parsed.quantity = quantity;
+      }
+
+      if (columnMap.has('diagnosisCode')) {
+        const diagnosisCode = String(row[columnMap.get('diagnosisCode')!] || '').trim();
+        if (diagnosisCode) parsed.diagnosisCode = diagnosisCode;
+      }
+
+      if (columnMap.has('outOfPocket')) {
+        const outOfPocket = parseNumber(row[columnMap.get('outOfPocket')!]);
+        if (outOfPocket !== undefined) parsed.outOfPocket = outOfPocket;
+      }
+
+      if (columnMap.has('planPaid')) {
+        const planPaid = parseNumber(row[columnMap.get('planPaid')!]);
+        if (planPaid !== undefined) parsed.planPaid = planPaid;
+      }
+
+      if (columnMap.has('trueDrugCost')) {
+        const trueDrugCost = parseNumber(row[columnMap.get('trueDrugCost')!]);
+        if (trueDrugCost !== undefined) parsed.trueDrugCost = trueDrugCost;
+      }
 
       parsedRows.push(parsed);
     } catch (error: any) {

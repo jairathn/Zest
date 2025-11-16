@@ -32,16 +32,39 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { firstName, lastName, dateOfBirth, externalId } = body;
+    const {
+      firstName,
+      lastName,
+      dateOfBirth,
+      externalId,
+      pharmacyInsuranceId,
+      streetAddress,
+      city,
+      state,
+      employer,
+      email,
+      phone,
+    } = body;
+
+    const updateData: any = {
+      firstName,
+      lastName,
+      dateOfBirth: new Date(dateOfBirth),
+    };
+
+    // Add optional fields only if they are provided
+    if (externalId !== undefined) updateData.externalId = externalId;
+    if (pharmacyInsuranceId !== undefined) updateData.pharmacyInsuranceId = pharmacyInsuranceId;
+    if (streetAddress !== undefined) updateData.streetAddress = streetAddress;
+    if (city !== undefined) updateData.city = city;
+    if (state !== undefined) updateData.state = state;
+    if (employer !== undefined) updateData.employer = employer;
+    if (email !== undefined) updateData.email = email;
+    if (phone !== undefined) updateData.phone = phone;
 
     const patient = await prisma.patient.update({
       where: { id: params.id },
-      data: {
-        firstName,
-        lastName,
-        dateOfBirth: new Date(dateOfBirth),
-        externalId,
-      },
+      data: updateData,
     });
 
     return NextResponse.json(patient);
