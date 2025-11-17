@@ -331,24 +331,42 @@ export default function AdminPage() {
 
       <div className="mt-8 card">
         <h3 className="mb-4">Expected CSV Formats</h3>
-        <div className="space-y-4 text-sm">
+        <div className="space-y-6 text-sm">
           <div>
-            <h4 className="font-semibold text-gray-900 mb-1">Formulary CSV</h4>
-            <code className="block bg-gray-100 p-2 rounded text-xs overflow-x-auto">
-              Drug Name, Generic Name, Drug Class, Tier, Annual Cost, Copay T1, Copay T2, Copay T3, PA Required
+            <h4 className="font-semibold text-gray-900 mb-2">Formulary CSV</h4>
+            <p className="text-xs text-gray-600 mb-2">Required columns: Drug Name, Drug Class, Tier (1-5)</p>
+            <code className="block bg-gray-100 p-2 rounded text-xs overflow-x-auto mb-2">
+              Drug Name, Generic Name, Drug Class, Tier, Requires PA, FDA Indications, Biosimilar Of
             </code>
+            <p className="text-xs text-gray-500">
+              Optional: Formulation, Strength, Step Therapy, Restrictions, Quantity Limit, NDC Code
+            </p>
           </div>
           <div>
-            <h4 className="font-semibold text-gray-900 mb-1">Claims CSV</h4>
-            <code className="block bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+            <h4 className="font-semibold text-gray-900 mb-2">Claims CSV</h4>
+            <p className="text-xs text-gray-600 mb-2">Required columns: Patient ID, Drug Name, Fill Date, Days Supply, Quantity</p>
+            <code className="block bg-gray-100 p-2 rounded text-xs overflow-x-auto mb-2">
               Patient ID, Drug Name, Fill Date, Days Supply, Quantity, Out of Pocket, Plan Paid
             </code>
+            <p className="text-xs text-gray-500">
+              Optional: NDC Code, True Drug Cost
+            </p>
           </div>
           <div>
-            <h4 className="font-semibold text-gray-900 mb-1">Eligibility CSV</h4>
-            <code className="block bg-gray-100 p-2 rounded text-xs overflow-x-auto">
-              Patient ID, First Name, Last Name, Date of Birth, Plan ID
+            <h4 className="font-semibold text-gray-900 mb-2">Eligibility CSV</h4>
+            <p className="text-xs text-gray-600 mb-2">Required columns: First Name, Last Name, Date of Birth</p>
+            <code className="block bg-gray-100 p-2 rounded text-xs overflow-x-auto mb-2">
+              Patient ID, First Name, Last Name, Date of Birth, Formulary Plan, Employer, City, State
             </code>
+            <p className="text-xs text-gray-500">
+              Optional: Street Address, Email, Phone, Eligibility Start/End Date, Cost Designation
+            </p>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-xs text-blue-800">
+              <strong>Note:</strong> Column names are flexible. The system recognizes common variations
+              (e.g., "Drug Name", "DrugName", "drug_name" all work). See parser documentation for full list.
+            </p>
           </div>
         </div>
       </div>
