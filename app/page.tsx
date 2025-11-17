@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Upload, FileText, TrendingDown } from "lucide-react";
+import { ArrowRight, Upload, FileText, TrendingDown, MapPin } from "lucide-react";
 
 export default function HomePage() {
   return (
@@ -21,7 +21,7 @@ export default function HomePage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
-      <div className="grid md:grid-cols-3 gap-8 mb-12">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
         <div className="card card-hover transform transition-all duration-200 hover:-translate-y-1">
           <Upload className="w-12 h-12 text-primary-600 mb-4 transition-transform duration-200 group-hover:scale-110" />
           <h3 className="mb-2">Upload Data</h3>
@@ -52,6 +52,17 @@ export default function HomePage() {
           </p>
           <Link href="/patients" className="text-primary-600 hover:text-primary-700 font-medium flex items-center transition-all duration-150 group">
             View Patients <ArrowRight className="w-4 h-4 ml-1 transition-transform duration-150 group-hover:translate-x-1" />
+          </Link>
+        </div>
+
+        <div className="card card-hover transform transition-all duration-200 hover:-translate-y-1">
+          <MapPin className="w-12 h-12 text-primary-600 mb-4 transition-transform duration-200 group-hover:scale-110" />
+          <h3 className="mb-2">Geographic Analytics</h3>
+          <p className="text-gray-600 mb-4">
+            Analyze program success rates and patient demographics by state and city
+          </p>
+          <Link href="/admin/analytics" className="text-primary-600 hover:text-primary-700 font-medium flex items-center transition-all duration-150 group">
+            View Analytics <ArrowRight className="w-4 h-4 ml-1 transition-transform duration-150 group-hover:translate-x-1" />
           </Link>
         </div>
       </div>
