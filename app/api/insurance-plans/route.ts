@@ -8,6 +8,11 @@ export async function GET() {
         id: true,
         planName: true,
         payerName: true,
+        _count: {
+          select: {
+            formularyDrugs: true,
+          },
+        },
       },
       orderBy: { planName: 'asc' },
     });
@@ -42,6 +47,55 @@ export async function POST(request: Request) {
     return NextResponse.json(plan);
   } catch (error: any) {
     console.error('Error creating insurance plan:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Plan ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if plan has any formulary drugs
+    const plan = await prisma.insurancePlan.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            formularyDrugs: true,
+          },
+        },
+      },
+    });
+
+    if (!plan) {
+      return NextResponse.json(
+        { error: 'Insurance plan not found' },
+        { status: 404 }
+      );
+    }
+
+    if (plan._count.formularyDrugs > 0) {
+      return NextResponse.json(
+        { error: `Cannot delete plan with ${plan._count.formularyDrugs} formulary drugs. Delete formulary data first.` },
+        { status: 400 }
+      );
+    }
+
+    await prisma.insurancePlan.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting insurance plan:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

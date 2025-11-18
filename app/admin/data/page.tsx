@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Trash2, FileText, Database, Users, BookOpen, Calendar, AlertCircle, CheckCircle, Eye } from 'lucide-react';
+import { Trash2, FileText, Database, Users, BookOpen, Calendar, AlertCircle, CheckCircle, Eye, Building2 } from 'lucide-react';
 
-type DataTab = 'knowledge' | 'formulary' | 'claims' | 'uploads';
+type DataTab = 'knowledge' | 'formulary' | 'claims' | 'uploads' | 'plans';
 
 interface KnowledgeDoc {
   id: string;
@@ -40,12 +40,22 @@ interface UploadLog {
   rowsFailed: number;
 }
 
+interface InsurancePlan {
+  id: string;
+  planName: string;
+  payerName: string;
+  _count: {
+    formularyDrugs: number;
+  };
+}
+
 export default function DataManagementPage() {
   const [activeTab, setActiveTab] = useState<DataTab>('knowledge');
   const [knowledge, setKnowledge] = useState<KnowledgeDoc[]>([]);
   const [formulary, setFormulary] = useState<FormularyDataset[]>([]);
   const [claims, setClaims] = useState<ClaimDataset[]>([]);
   const [uploads, setUploads] = useState<UploadLog[]>([]);
+  const [plans, setPlans] = useState<InsurancePlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -57,22 +67,30 @@ export default function DataManagementPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/data?type=${activeTab}`);
-      const data = await res.json();
+      let res, data;
 
-      switch (activeTab) {
-        case 'knowledge':
-          setKnowledge(data);
-          break;
-        case 'formulary':
-          setFormulary(data);
-          break;
-        case 'claims':
-          setClaims(data);
-          break;
-        case 'uploads':
-          setUploads(data);
-          break;
+      if (activeTab === 'plans') {
+        res = await fetch('/api/insurance-plans');
+        data = await res.json();
+        setPlans(data);
+      } else {
+        res = await fetch(`/api/admin/data?type=${activeTab}`);
+        data = await res.json();
+
+        switch (activeTab) {
+          case 'knowledge':
+            setKnowledge(data);
+            break;
+          case 'formulary':
+            setFormulary(data);
+            break;
+          case 'claims':
+            setClaims(data);
+            break;
+          case 'uploads':
+            setUploads(data);
+            break;
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -86,9 +104,17 @@ export default function DataManagementPage() {
 
     setDeleting(id);
     try {
-      const res = await fetch(`/api/admin/data?type=${type}&id=${id}`, {
-        method: 'DELETE',
-      });
+      let res;
+
+      if (type === 'plans') {
+        res = await fetch(`/api/insurance-plans?id=${id}`, {
+          method: 'DELETE',
+        });
+      } else {
+        res = await fetch(`/api/admin/data?type=${type}&id=${id}`, {
+          method: 'DELETE',
+        });
+      }
 
       if (res.ok) {
         setMessage({ type: 'success', text: 'Item deleted successfully' });
@@ -115,6 +141,7 @@ export default function DataManagementPage() {
     { id: 'knowledge' as DataTab, label: 'Knowledge Base', icon: BookOpen, count: knowledge.length },
     { id: 'formulary' as DataTab, label: 'Formulary', icon: Database, count: formulary.length },
     { id: 'claims' as DataTab, label: 'Claims', icon: FileText, count: claims.length },
+    { id: 'plans' as DataTab, label: 'Insurance Plans', icon: Building2, count: plans.length },
     { id: 'uploads' as DataTab, label: 'Upload History', icon: Calendar, count: uploads.length },
   ];
 
@@ -447,6 +474,72 @@ export default function DataManagementPage() {
                   <div className="text-center py-12">
                     <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-500">No upload history</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Insurance Plans Table */}
+            {activeTab === 'plans' && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Plan Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Payer
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Formulary Drugs
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {plans.map((plan) => (
+                      <tr key={plan.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {plan.planName}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {plan.payerName}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {plan._count.formularyDrugs > 0 ? (
+                            <span className="text-gray-900">{plan._count.formularyDrugs} drugs</span>
+                          ) : (
+                            <span className="text-gray-400">Empty</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => handleDelete(plan.id, 'plans')}
+                            disabled={deleting === plan.id || plan._count.formularyDrugs > 0}
+                            className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:scale-110 active:scale-95"
+                            title={plan._count.formularyDrugs > 0 ? 'Delete formulary data first' : 'Delete insurance plan'}
+                          >
+                            {deleting === plan.id ? (
+                              <svg className="spinner w-4 h-4 inline" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                            ) : (
+                              <Trash2 className="w-4 h-4 inline" />
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {plans.length === 0 && (
+                  <div className="text-center py-12">
+                    <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No insurance plans created</p>
                   </div>
                 )}
               </div>
