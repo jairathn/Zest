@@ -55,6 +55,7 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const force = searchParams.get('force') === 'true';
 
     if (!id) {
       return NextResponse.json(
@@ -82,7 +83,13 @@ export async function DELETE(request: Request) {
       );
     }
 
-    if (plan._count.formularyDrugs > 0) {
+    // If force delete, remove all formulary drugs first
+    if (force && plan._count.formularyDrugs > 0) {
+      await prisma.formularyDrug.deleteMany({
+        where: { planId: id },
+      });
+      console.log(`Force deleted ${plan._count.formularyDrugs} formulary drugs for plan ${plan.planName}`);
+    } else if (plan._count.formularyDrugs > 0) {
       return NextResponse.json(
         { error: `Cannot delete plan with ${plan._count.formularyDrugs} formulary drugs. Delete formulary data first.` },
         { status: 400 }
