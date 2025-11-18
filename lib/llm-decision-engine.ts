@@ -521,8 +521,9 @@ CLINICAL DECISION-MAKING GUIDELINES:
 4. **stable_suboptimal** - TIER-SPECIFIC STRATEGY (Tiers 2-5):
 
    ALWAYS generate exactly 3 unique recommendations. NEVER recommend the same drug twice.
+   ⚠️ DO NOT output placeholder text like "No Tier 1 options available" as a drug name.
 
-   a. **Primary: Switch to Tier 1** (Recommendations 1-N):
+   a. **Primary: Switch to Tier 1** (If Tier 1 count > 0):
       - Recommend ALL unique Tier 1 drugs available (check the count above)
       - Each Tier 1 drug should only be recommended ONCE
       - Prioritize biosimilars of current drug if available
@@ -530,19 +531,27 @@ CLINICAL DECISION-MAKING GUIDELINES:
       - Then cross-class if better efficacy
       - No RAG needed for switch rationale (formulary alignment is self-evident)
 
-   b. **Secondary: Dose Reduction** (If <3 unique Tier 1 options available):
+   b. **Secondary: Dose Reduction** (If Tier 1 count < 3 AND patient stable):
       - ONLY for Tier 2 or Tier 3 patients (NOT Tier 4-5)
       - Reduce dose/extend interval of current drug (cite RAG evidence)
       - Example: If only 2 unique Tier 1 drugs → Rec 1: Switch to Tier 1 drug A, Rec 2: Switch to Tier 1 drug B, Rec 3: Dose reduce current drug
 
-   c. **Tertiary: Next Best Tier** (If still <3 recommendations):
-      - Recommend next best available tier (e.g., Tier 2 if no more Tier 1 options and dose reduction not applicable)
+   c. **If NO Tier 1 options** (e.g., all contraindicated):
+      - DO NOT recommend dose reduction as primary strategy
+      - Switch to Tier 2 or Tier 3 alternatives with DIFFERENT mechanisms (respect contraindications)
+      - Tier 2: Recommend other Tier 2 drugs with different mechanisms
+      - Tier 3: Recommend Tier 2 drugs (upgrade) or stay at Tier 3 with different mechanism
+      - Example: Patient on Tier 2 IL-17, TNF contraindicated → Recommend Tier 3 IL-23 inhibitors or oral options
+      - Focus on mechanism switching for clinical benefit, not just tier optimization
+
+   d. **Tertiary: Next Best Tier** (If still <3 recommendations):
+      - Recommend next best available tier drugs with different mechanisms
       - Only if absolutely necessary to reach 3 total recommendations
 
-   d. **Tier-Specific Notes**:
-      - Tier 2: Both switch to Tier 1 AND dose reduction are viable
-      - Tier 3: Prefer switch to Tier 1, dose reduction only if needed for 3rd recommendation
-      - Tier 4-5: NEVER dose reduce, ONLY switch to lower tiers (urgently to Tier 1)
+   e. **Tier-Specific Notes**:
+      - Tier 2: Prefer switch to Tier 1 if available, otherwise same-tier switches
+      - Tier 3: Prefer switch to Tier 1, then Tier 2, only if needed dose reduction
+      - Tier 4-5: NEVER dose reduce, ONLY switch to lower tiers (urgently to Tier 1 or Tier 2/3)
 
 5. **unstable_optimal** (Tier 1, unstable):
    - Switch to different Tier 1 with superior efficacy (cite evidence)
@@ -550,10 +559,26 @@ CLINICAL DECISION-MAKING GUIDELINES:
    - Target drugs with proven higher efficacy for ${assessment.diagnosis}
 
 6. **unstable_suboptimal** (Tier 2-5, unstable):
-   - Switch to Tier 1 drug with best efficacy for ${assessment.diagnosis} (cite evidence)
-   - Prefer different mechanism if current class failing
-   - NEVER dose reduce (patient is unstable - needs better control)
-   - For Tier 4-5: URGENT switch to Tier 1 (patient paying very high cost for suboptimal control)
+
+   ⚠️ CRITICAL: NEVER recommend dose reduction for unstable patients (DLQI >1)
+
+   a. **If Tier 1 options available**:
+      - Switch to Tier 1 drug with best efficacy for ${assessment.diagnosis} (cite evidence)
+      - Prefer different mechanism if current class failing (e.g., TNF → IL-17/IL-23)
+      - Generate 3 Tier 1 switch recommendations
+
+   b. **If NO Tier 1 options available** (e.g., all contraindicated):
+      - DO NOT output placeholder text like "No Tier 1 options available"
+      - Switch to Tier 2 or Tier 3 drugs with DIFFERENT mechanisms
+      - Prioritize IL-23 inhibitors (Risankizumab, Guselkumab) for superior efficacy
+      - Consider oral options (Apremilast, Deucravacitinib) as alternatives
+      - Example: If on IL-17 inhibitor (Tier 2) → Switch to IL-23 inhibitor (Tier 3)
+      - Generate 3 switch recommendations from available Tier 2/3 options
+
+   c. **For Tier 4-5**:
+      - URGENT switch to lower tiers (Tier 1 if available, otherwise Tier 2/3)
+      - Patient paying very high cost for suboptimal control
+      - NEVER dose reduce unstable patients regardless of tier
 
 PRIORITIZATION:
 - Always prefer Tier 1 > Tier 2 > Tier 3 > Tier 4 > Tier 5
@@ -869,13 +894,29 @@ export async function generateLLMRecommendations(
     patient.contraindications
   );
 
-  // Deduplicate recommendations by drug name (in case LLM generated same drug twice)
-  // Keep first occurrence only
+  // Deduplicate and validate recommendations
+  // Filter out: duplicates, invalid drug names, unstable + dose reduction
   const seenDrugs = new Set<string>();
   const llmRecs = rawLlmRecs.filter(rec => {
-    if (rec.type === 'DOSE_REDUCTION' || rec.type === 'CONTINUE_CURRENT') {
-      return true; // Always include dose reduction and continue current
+    // Filter out placeholder/invalid drug names
+    const invalidDrugNames = ['no tier 1', 'no tier 2', 'no tier', 'not available', 'none available'];
+    if (rec.drugName && invalidDrugNames.some(invalid => rec.drugName!.toLowerCase().includes(invalid))) {
+      console.log(`  ⚠️  Removing invalid placeholder recommendation: ${rec.drugName}`);
+      return false;
     }
+
+    // Filter out dose reduction for unstable patients (DLQI > 1)
+    if (rec.type === 'DOSE_REDUCTION' && assessment.dlqiScore > 1) {
+      console.log(`  ⚠️  Removing dose reduction for unstable patient (DLQI: ${assessment.dlqiScore})`);
+      return false;
+    }
+
+    // Always include dose reduction and continue current (if valid)
+    if (rec.type === 'DOSE_REDUCTION' || rec.type === 'CONTINUE_CURRENT') {
+      return true;
+    }
+
+    // Check for duplicates
     const drugKey = rec.drugName?.toLowerCase();
     if (!drugKey || seenDrugs.has(drugKey)) {
       console.log(`  ℹ️  Removing duplicate recommendation for: ${rec.drugName}`);
@@ -885,7 +926,7 @@ export async function generateLLMRecommendations(
     return true;
   });
 
-  console.log(`LLM generated ${rawLlmRecs.length} recommendations, kept ${llmRecs.length} after deduplication`);
+  console.log(`LLM generated ${rawLlmRecs.length} recommendations, kept ${llmRecs.length} after validation`);
 
   // Step 5: Add cost calculations and retrieve drug-specific evidence for dose reduction
   // TRUE RAG: Only retrieve evidence for DOSE_REDUCTION (needs literature to convince clinicians)
