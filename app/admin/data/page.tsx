@@ -99,7 +99,7 @@ export default function DataManagementPage() {
     }
   };
 
-  const handleDelete = async (id: string, type: DataTab) => {
+  const handleDelete = async (id: string, type: DataTab, forceDelete = false) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
 
     setDeleting(id);
@@ -107,7 +107,10 @@ export default function DataManagementPage() {
       let res;
 
       if (type === 'plans') {
-        res = await fetch(`/api/insurance-plans?id=${id}`, {
+        const url = forceDelete
+          ? `/api/insurance-plans?id=${id}&force=true`
+          : `/api/insurance-plans?id=${id}`;
+        res = await fetch(url, {
           method: 'DELETE',
         });
       } else {
@@ -128,6 +131,19 @@ export default function DataManagementPage() {
     } finally {
       setDeleting(null);
       setTimeout(() => setMessage(null), 3000);
+    }
+  };
+
+  const handleForceDelete = async (id: string, planName: string, drugCount: number) => {
+    const confirmed = confirm(
+      `⚠️ WARNING: Force Delete\n\n` +
+      `This will permanently delete "${planName}" and ALL ${drugCount} associated formulary drugs.\n\n` +
+      `This is useful for cleaning up orphaned data that doesn't appear in the Formulary tab.\n\n` +
+      `Are you sure you want to continue?`
+    );
+
+    if (confirmed) {
+      handleDelete(id, 'plans', true);
     }
   };
 
@@ -516,21 +532,40 @@ export default function DataManagementPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleDelete(plan.id, 'plans')}
-                            disabled={deleting === plan.id || plan._count.formularyDrugs > 0}
-                            className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:scale-110 active:scale-95"
-                            title={plan._count.formularyDrugs > 0 ? 'Delete formulary data first' : 'Delete insurance plan'}
-                          >
-                            {deleting === plan.id ? (
-                              <svg className="spinner w-4 h-4 inline" viewBox="0 0 24 24" fill="none">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                              </svg>
-                            ) : (
-                              <Trash2 className="w-4 h-4 inline" />
-                            )}
-                          </button>
+                          {plan._count.formularyDrugs > 0 ? (
+                            <button
+                              onClick={() => handleForceDelete(plan.id, plan.planName, plan._count.formularyDrugs)}
+                              disabled={deleting === plan.id}
+                              className="text-orange-600 hover:text-orange-900 disabled:opacity-50 transition-all duration-150 hover:scale-110 active:scale-95 font-medium"
+                              title="Force delete plan and all formulary drugs"
+                            >
+                              {deleting === plan.id ? (
+                                <svg className="spinner w-4 h-4 inline mr-1" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                              ) : (
+                                <AlertCircle className="w-4 h-4 inline mr-1" />
+                              )}
+                              Force Delete
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleDelete(plan.id, 'plans')}
+                              disabled={deleting === plan.id}
+                              className="text-red-600 hover:text-red-900 disabled:opacity-50 transition-all duration-150 hover:scale-110 active:scale-95"
+                              title="Delete insurance plan"
+                            >
+                              {deleting === plan.id ? (
+                                <svg className="spinner w-4 h-4 inline" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                              ) : (
+                                <Trash2 className="w-4 h-4 inline" />
+                              )}
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
