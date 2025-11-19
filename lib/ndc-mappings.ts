@@ -35,6 +35,9 @@ export const biologicNdcMappings = [
   { ndcCode: '55513-0954-02', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '80mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '55513-400-01', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '55513-411-01', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Autoinjector' },
+  { ndcCode: '55513-479-01', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '20mg/0.4mL', dosageForm: 'Syringe' },
+  { ndcCode: '55513-482-01', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '10mg/0.2mL', dosageForm: 'Syringe' },
+  { ndcCode: '55513-996-01', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
 
   // CYLTEZO (adalimumab-adbm biosimilar) - Boehringer Ingelheim
   { ndcCode: '0597-0140-02', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
@@ -42,6 +45,11 @@ export const biologicNdcMappings = [
   { ndcCode: '0597-0375-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '0597-0495-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '0597-0545-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
+  { ndcCode: '0597-0370-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '0597-0405-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '0597-0575-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
+  { ndcCode: '0597-0555-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '0597-0595-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
 
   // HADLIMA (adalimumab-bwwd biosimilar) - Samsung Bioepis
   { ndcCode: '66215-0501-02', drugName: 'Hadlima', genericName: 'adalimumab-bwwd', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
@@ -57,6 +65,8 @@ export const biologicNdcMappings = [
   { ndcCode: '72606-022-01', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '72606-030-01', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
   { ndcCode: '72606-025-01', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '72606-023-01', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '72606-039-01', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '80mg/0.8mL', dosageForm: 'Syringe' },
 
   // YUSIMRY (adalimumab-aqvh biosimilar) - Coherus
   { ndcCode: '69452-0401-02', drugName: 'Yusimry', genericName: 'adalimumab-aqvh', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
@@ -73,6 +83,10 @@ export const biologicNdcMappings = [
   { ndcCode: '58406-0425-52', drugName: 'Enbrel', genericName: 'etanercept', drugClass: 'TNF_INHIBITOR', strength: '25mg/0.5mL', dosageForm: 'Syringe' },
   { ndcCode: '58406-0445-34', drugName: 'Enbrel', genericName: 'etanercept', drugClass: 'TNF_INHIBITOR', strength: '50mg/mL', dosageForm: 'Autoinjector' },
   { ndcCode: '58406-0445-52', drugName: 'Enbrel', genericName: 'etanercept', drugClass: 'TNF_INHIBITOR', strength: '50mg/mL', dosageForm: 'Autoinjector' },
+  { ndcCode: '58406-021-01', drugName: 'Enbrel', genericName: 'etanercept', drugClass: 'TNF_INHIBITOR', strength: '25mg', dosageForm: 'Vial' },
+  { ndcCode: '58406-010-04', drugName: 'Enbrel', genericName: 'etanercept', drugClass: 'TNF_INHIBITOR', strength: '25mg', dosageForm: 'Vial' },
+  { ndcCode: '58406-424-01', drugName: 'Enbrel', genericName: 'etanercept', drugClass: 'TNF_INHIBITOR', strength: '25mg/0.5mL', dosageForm: 'Cartridge' },
+  { ndcCode: '58406-055-04', drugName: 'Enbrel', genericName: 'etanercept', drugClass: 'TNF_INHIBITOR', strength: '50mg', dosageForm: 'Vial' },
 
   // ERELZI (etanercept-szzs biosimilar) - Sandoz
   { ndcCode: '0781-7105-94', drugName: 'Erelzi', genericName: 'etanercept-szzs', drugClass: 'TNF_INHIBITOR', strength: '50mg/mL', dosageForm: 'Syringe' },
@@ -87,6 +101,7 @@ export const biologicNdcMappings = [
   // CIMZIA (certolizumab pegol) - UCB
   { ndcCode: '50474-0700-01', drugName: 'Cimzia', genericName: 'certolizumab pegol', drugClass: 'TNF_INHIBITOR', strength: '200mg/mL', dosageForm: 'Syringe' },
   { ndcCode: '50474-0700-02', drugName: 'Cimzia', genericName: 'certolizumab pegol', drugClass: 'TNF_INHIBITOR', strength: '200mg/mL', dosageForm: 'Syringe' },
+  { ndcCode: '50474-710-01', drugName: 'Cimzia', genericName: 'certolizumab pegol', drugClass: 'TNF_INHIBITOR', strength: '200mg/mL', dosageForm: 'Syringe' },
 
   // REMICADE/Infliximab (infliximab) - Janssen
   { ndcCode: '57894-160-01', drugName: 'Remicade', genericName: 'infliximab', drugClass: 'TNF_INHIBITOR', strength: '100mg', dosageForm: 'Vial' },
@@ -103,6 +118,7 @@ export const biologicNdcMappings = [
   { ndcCode: '0078-0670-68', drugName: 'Cosentyx', genericName: 'secukinumab', drugClass: 'IL17_INHIBITOR', strength: '150mg/mL', dosageForm: 'Syringe' },
   { ndcCode: '0078-0715-61', drugName: 'Cosentyx', genericName: 'secukinumab', drugClass: 'IL17_INHIBITOR', strength: '300mg/2mL', dosageForm: 'Pen' },
   { ndcCode: '0078-0715-68', drugName: 'Cosentyx', genericName: 'secukinumab', drugClass: 'IL17_INHIBITOR', strength: '300mg/2mL', dosageForm: 'Pen' },
+  { ndcCode: '0078-1070-01', drugName: 'Cosentyx', genericName: 'secukinumab', drugClass: 'IL17_INHIBITOR', strength: '150mg/mL', dosageForm: 'Vial' },
 
   // TALTZ (ixekizumab) - Eli Lilly
   { ndcCode: '0002-1467-01', drugName: 'Taltz', genericName: 'ixekizumab', drugClass: 'IL17_INHIBITOR', strength: '80mg/mL', dosageForm: 'Autoinjector' },
@@ -111,6 +127,8 @@ export const biologicNdcMappings = [
   { ndcCode: '0002-1468-01', drugName: 'Taltz', genericName: 'ixekizumab', drugClass: 'IL17_INHIBITOR', strength: '80mg/mL', dosageForm: 'Syringe' },
   { ndcCode: '0002-1468-02', drugName: 'Taltz', genericName: 'ixekizumab', drugClass: 'IL17_INHIBITOR', strength: '80mg/mL', dosageForm: 'Syringe' },
   { ndcCode: '0002-1468-03', drugName: 'Taltz', genericName: 'ixekizumab', drugClass: 'IL17_INHIBITOR', strength: '80mg/mL', dosageForm: 'Syringe' },
+  { ndcCode: '0002-7797-01', drugName: 'Taltz', genericName: 'ixekizumab', drugClass: 'IL17_INHIBITOR', strength: '80mg/mL', dosageForm: 'Autoinjector' },
+  { ndcCode: '0002-7772-01', drugName: 'Taltz', genericName: 'ixekizumab', drugClass: 'IL17_INHIBITOR', strength: '80mg/mL', dosageForm: 'Syringe' },
 
   // SILIQ (brodalumab) - Bausch Health (discontinued but may appear in historical data)
   { ndcCode: '50486-1010-01', drugName: 'Siliq', genericName: 'brodalumab', drugClass: 'IL17_INHIBITOR', strength: '210mg/1.5mL', dosageForm: 'Syringe' },
@@ -125,6 +143,7 @@ export const biologicNdcMappings = [
   { ndcCode: '57894-0060-02', drugName: 'Tremfya', genericName: 'guselkumab', drugClass: 'IL23_INHIBITOR', strength: '100mg/mL', dosageForm: 'Syringe' },
   { ndcCode: '57894-0061-01', drugName: 'Tremfya', genericName: 'guselkumab', drugClass: 'IL23_INHIBITOR', strength: '100mg/mL', dosageForm: 'One-Press' },
   { ndcCode: '57894-0061-02', drugName: 'Tremfya', genericName: 'guselkumab', drugClass: 'IL23_INHIBITOR', strength: '100mg/mL', dosageForm: 'One-Press' },
+  { ndcCode: '57894-650-01', drugName: 'Tremfya', genericName: 'guselkumab', drugClass: 'IL23_INHIBITOR', strength: '100mg/mL', dosageForm: 'IV Infusion' },
 
   // SKYRIZI (risankizumab-rzaa) - AbbVie
   { ndcCode: '0074-0554-71', drugName: 'Skyrizi', genericName: 'risankizumab-rzaa', drugClass: 'IL23_INHIBITOR', strength: '150mg/mL', dosageForm: 'Syringe' },
@@ -164,6 +183,8 @@ export const biologicNdcMappings = [
   { ndcCode: '00024-5912-02', drugName: 'Dupixent', genericName: 'dupilumab', drugClass: 'IL4_13_INHIBITOR', strength: '200mg/1.14mL', dosageForm: 'Syringe' },
   { ndcCode: '00024-5913-01', drugName: 'Dupixent', genericName: 'dupilumab', drugClass: 'IL4_13_INHIBITOR', strength: '300mg/2mL', dosageForm: 'Pen' },
   { ndcCode: '00024-5913-02', drugName: 'Dupixent', genericName: 'dupilumab', drugClass: 'IL4_13_INHIBITOR', strength: '300mg/2mL', dosageForm: 'Pen' },
+  { ndcCode: '0024-5914-01', drugName: 'Dupixent', genericName: 'dupilumab', drugClass: 'IL4_13_INHIBITOR', strength: '200mg/1.14mL', dosageForm: 'Pen' },
+  { ndcCode: '0024-5918-01', drugName: 'Dupixent', genericName: 'dupilumab', drugClass: 'IL4_13_INHIBITOR', strength: '100mg/0.67mL', dosageForm: 'Syringe' },
 
   // ========================================
   // JAK INHIBITORS (Oral, not injectable but relevant)
@@ -173,6 +194,8 @@ export const biologicNdcMappings = [
   { ndcCode: '0074-1065-30', drugName: 'Rinvoq', genericName: 'upadacitinib', drugClass: 'JAK_INHIBITOR', strength: '15mg', dosageForm: 'Tablet' },
   { ndcCode: '0074-1066-30', drugName: 'Rinvoq', genericName: 'upadacitinib', drugClass: 'JAK_INHIBITOR', strength: '30mg', dosageForm: 'Tablet' },
   { ndcCode: '0074-1067-30', drugName: 'Rinvoq', genericName: 'upadacitinib', drugClass: 'JAK_INHIBITOR', strength: '45mg', dosageForm: 'Tablet' },
+  { ndcCode: '0074-1069-01', drugName: 'Rinvoq', genericName: 'upadacitinib', drugClass: 'JAK_INHIBITOR', strength: '45mg', dosageForm: 'Tablet' },
+  { ndcCode: '0074-1050-01', drugName: 'Rinvoq', genericName: 'upadacitinib', drugClass: 'JAK_INHIBITOR', strength: '15mg', dosageForm: 'Tablet' },
 
   // CIBINQO (abrocitinib) - Pfizer
   { ndcCode: '00069-0261-30', drugName: 'Cibinqo', genericName: 'abrocitinib', drugClass: 'JAK_INHIBITOR', strength: '50mg', dosageForm: 'Tablet' },
