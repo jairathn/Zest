@@ -7,14 +7,22 @@ export async function POST(
 ) {
   try {
     const body = await request.json();
-    const { drugName, dose, frequency } = body;
+    const {
+      drugName,
+      dose,
+      frequency,
+      isManualOverride,
+      claimsDrugName,
+      claimsDose,
+      claimsFrequency,
+    } = body;
 
     // Delete existing biologics for this patient
     await prisma.currentBiologic.deleteMany({
       where: { patientId: params.id },
     });
 
-    // Create new biologic
+    // Create new biologic with override tracking
     const biologic = await prisma.currentBiologic.create({
       data: {
         patientId: params.id,
@@ -23,6 +31,11 @@ export async function POST(
         frequency: frequency || 'See label',
         route: 'SC',
         startDate: new Date(),
+        // Override tracking (Option C: Store both claims value and override)
+        isManualOverride: isManualOverride || false,
+        claimsDrugName: claimsDrugName || null,
+        claimsDose: claimsDose || null,
+        claimsFrequency: claimsFrequency || null,
       },
     });
 

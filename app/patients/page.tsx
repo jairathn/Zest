@@ -2,12 +2,17 @@ import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { ChevronRight, User, Edit, Trash2 } from 'lucide-react';
 import DeletePatientButton from './DeletePatientButton';
+import { getCurrentBiologicFromClaims } from '@/lib/claims-biologic-service';
 
 export default async function PatientsPage() {
   const patients = await prisma.patient.findMany({
     include: {
       currentBiologics: true,
       plan: true,
+      claims: {
+        orderBy: { fillDate: 'desc' },
+        take: 5, // Get recent claims for biologic inference
+      },
       assessments: {
         orderBy: { assessedAt: 'desc' },
         take: 1,
@@ -45,8 +50,25 @@ export default async function PatientsPage() {
             </thead>
             <tbody>
               {patients.map((patient) => {
-                const biologic = patient.currentBiologics[0];
+                // PRIMARY SOURCE: Claims data (most recent fill with NDC)
+                const claimsBiologic = getCurrentBiologicFromClaims(patient.claims);
+
+                // SECONDARY SOURCE: Manual entry (if no claims or if override exists)
+                const manualBiologic = patient.currentBiologics[0];
+
+                // Display claims data if available, otherwise fall back to manual entry
+                const displayBiologic = claimsBiologic || (manualBiologic ? {
+                  drugName: manualBiologic.drugName,
+                  dose: manualBiologic.dose,
+                  frequency: manualBiologic.frequency,
+                  isManual: true,
+                } : null);
+
                 const lastAssessment = patient.assessments[0];
+
+                // Check if manual entry differs from claims (override indicator)
+                const hasOverride = manualBiologic && claimsBiologic &&
+                  manualBiologic.drugName.toLowerCase() !== claimsBiologic.drugName.toLowerCase();
 
                 return (
                   <tr key={patient.id} className="border-b hover:bg-gray-50">
@@ -83,12 +105,24 @@ export default async function PatientsPage() {
                       {patient.plan?.planName || patient.formularyPlanName || '—'}
                     </td>
                     <td className="py-3 px-4">
-                      {biologic ? (
+                      {displayBiologic ? (
                         <div>
-                          <div className="text-sm font-medium">{biologic.drugName}</div>
-                          <div className="text-xs text-gray-500">
-                            {biologic.dose} {biologic.frequency}
+                          <div className="text-sm font-medium">
+                            {displayBiologic.drugName}
+                            {hasOverride && (
+                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800" title="Manual override of claims data">
+                                Override
+                              </span>
+                            )}
                           </div>
+                          <div className="text-xs text-gray-500">
+                            {displayBiologic.dose} {displayBiologic.frequency}
+                          </div>
+                          {claimsBiologic && (
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              From claims ({new Date(claimsBiologic.lastFillDate).toLocaleDateString()})
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <span className="text-sm text-gray-400">None</span>

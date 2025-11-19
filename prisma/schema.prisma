@@ -168,6 +168,13 @@ model CurrentBiologic {
   route        String
   startDate    DateTime
   lastFillDate DateTime?
+
+  // Override tracking (Option C: Store both claims value and override)
+  isManualOverride Boolean  @default(false)  // User manually changed from claims data
+  claimsDrugName   String?                   // What claims data says
+  claimsDose       String?                   // Dose from claims
+  claimsFrequency  String?                   // Frequency from claims (inferred)
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

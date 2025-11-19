@@ -16,6 +16,10 @@ export default function AssessmentPage() {
   const router = useRouter();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(false);
+  const [claimsBiologic, setClaimsBiologic] = useState<any>(null); // Biologic from claims data
+  const [showOverrideWarning, setShowOverrideWarning] = useState(false);
+  const [pendingBiologicChange, setPendingBiologicChange] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
     patientId: '',
     notOnBiologic: false,
@@ -48,18 +52,22 @@ export default function AssessmentPage() {
       });
   }, []);
 
-  // Auto-fill current biologic from most recent claims when patient is selected
+  // Auto-fill current biologic from claims data (SOURCE OF TRUTH)
   const handlePatientChange = async (patientId: string) => {
-    setFormData({ ...formData, patientId });
-
-    if (!patientId) return;
+    if (!patientId) {
+      setFormData({ ...formData, patientId: '' });
+      setClaimsBiologic(null);
+      return;
+    }
 
     try {
       // Fetch patient data with claims
       const res = await fetch(`/api/patients/${patientId}`);
       const patientData = await res.json();
 
-      // If patient has recent claims with NDC codes, auto-fill biologic info
+      // Get biologic from claims (PRIMARY SOURCE)
+      let biologicFromClaims = null;
+
       if (patientData.claims && patientData.claims.length > 0) {
         // Find most recent claim with NDC code
         const claimWithNdc = patientData.claims.find((claim: any) => claim.ndcCode);
@@ -70,20 +78,31 @@ export default function AssessmentPage() {
           const drugInfo = await ndcRes.json();
 
           if (drugInfo && drugInfo.drugName) {
-            setFormData(prev => ({
-              ...prev,
-              patientId,
-              currentBiologic: drugInfo.drugName,
-              dose: drugInfo.strength || prev.dose,
-              frequency: 'As prescribed', // Can be customized based on data
-            }));
-            return;
+            biologicFromClaims = {
+              drugName: drugInfo.drugName,
+              dose: drugInfo.strength || 'As prescribed',
+              frequency: 'As prescribed', // Can be inferred from claims pattern
+              lastFillDate: claimWithNdc.fillDate,
+              ndcCode: claimWithNdc.ndcCode,
+            };
           }
         }
       }
 
-      // If no NDC data, check for existing current biologics
-      if (patientData.currentBiologics && patientData.currentBiologics.length > 0) {
+      // Store claims biologic for override detection
+      setClaimsBiologic(biologicFromClaims);
+
+      // Auto-populate form with claims data if available
+      if (biologicFromClaims) {
+        setFormData(prev => ({
+          ...prev,
+          patientId,
+          currentBiologic: biologicFromClaims.drugName,
+          dose: biologicFromClaims.dose,
+          frequency: biologicFromClaims.frequency,
+        }));
+      } else if (patientData.currentBiologics && patientData.currentBiologics.length > 0) {
+        // Fall back to manual entry if no claims data
         const currentBio = patientData.currentBiologics[0];
         setFormData(prev => ({
           ...prev,
@@ -92,11 +111,53 @@ export default function AssessmentPage() {
           dose: currentBio.dose,
           frequency: currentBio.frequency,
         }));
+      } else {
+        // No biologic data at all
+        setFormData(prev => ({
+          ...prev,
+          patientId,
+        }));
       }
     } catch (error) {
       console.error('Error fetching patient data:', error);
-      // Just set the patient ID even if auto-fill fails
       setFormData({ ...formData, patientId });
+    }
+  };
+
+  // Handle biologic change with override warning
+  const handleBiologicChange = (newDrugName: string) => {
+    // Check if this differs from claims data
+    if (claimsBiologic && newDrugName.toLowerCase().trim() !== claimsBiologic.drugName.toLowerCase().trim()) {
+      // Show override warning
+      setPendingBiologicChange(newDrugName);
+      setShowOverrideWarning(true);
+    } else {
+      // No conflict, just update
+      setFormData(prev => ({ ...prev, currentBiologic: newDrugName }));
+    }
+  };
+
+  // Confirm override
+  const confirmOverride = () => {
+    if (pendingBiologicChange !== null) {
+      setFormData(prev => ({ ...prev, currentBiologic: pendingBiologicChange }));
+    }
+    setShowOverrideWarning(false);
+    setPendingBiologicChange(null);
+  };
+
+  // Cancel override, keep claims data
+  const cancelOverride = () => {
+    setShowOverrideWarning(false);
+    setPendingBiologicChange(null);
+    // Revert to claims data
+    if (claimsBiologic) {
+      setFormData(prev => ({
+        ...prev,
+        currentBiologic: claimsBiologic.drugName,
+        dose: claimsBiologic.dose,
+        frequency: claimsBiologic.frequency,
+      }));
     }
   };
 
@@ -107,6 +168,10 @@ export default function AssessmentPage() {
     try {
       // First, create/update current biologic (skip if not on biologic)
       if (!formData.notOnBiologic && formData.currentBiologic) {
+        // Determine if this is an override
+        const isOverride = claimsBiologic &&
+          formData.currentBiologic.toLowerCase().trim() !== claimsBiologic.drugName.toLowerCase().trim();
+
         await fetch('/api/patients/' + formData.patientId + '/biologic', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -114,6 +179,11 @@ export default function AssessmentPage() {
             drugName: formData.currentBiologic,
             dose: formData.dose,
             frequency: formData.frequency,
+            // Pass override tracking data
+            isManualOverride: isOverride,
+            claimsDrugName: claimsBiologic?.drugName || null,
+            claimsDose: claimsBiologic?.dose || null,
+            claimsFrequency: claimsBiologic?.frequency || null,
           }),
         });
       }
@@ -205,20 +275,39 @@ export default function AssessmentPage() {
           </label>
 
           {!formData.notOnBiologic && (
-            <BiologicInput
-              value={{
-                drugName: formData.currentBiologic,
-                dose: formData.dose,
-                frequency: formData.frequency,
-              }}
-              onChange={(value) => setFormData({
-                ...formData,
-                currentBiologic: value.drugName,
-                dose: value.dose,
-                frequency: value.frequency,
-              })}
-              required={!formData.notOnBiologic}
-            />
+            <>
+              {claimsBiologic && (
+                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-sm text-blue-800">
+                    <strong>Claims data:</strong> {claimsBiologic.drugName} {claimsBiologic.dose} {claimsBiologic.frequency}
+                    <br />
+                    <span className="text-xs text-blue-600">
+                      Last fill: {new Date(claimsBiologic.lastFillDate).toLocaleDateString()}
+                    </span>
+                  </p>
+                </div>
+              )}
+              <BiologicInput
+                value={{
+                  drugName: formData.currentBiologic,
+                  dose: formData.dose,
+                  frequency: formData.frequency,
+                }}
+                onChange={(value) => {
+                  // Check if drug name changed (trigger override warning)
+                  if (value.drugName !== formData.currentBiologic) {
+                    handleBiologicChange(value.drugName);
+                  }
+                  // Update dose and frequency without warning
+                  setFormData(prev => ({
+                    ...prev,
+                    dose: value.dose,
+                    frequency: value.frequency,
+                  }));
+                }}
+                required={!formData.notOnBiologic}
+              />
+            </>
           )}
         </div>
 
@@ -365,6 +454,47 @@ export default function AssessmentPage() {
           </button>
         </div>
       </form>
+
+      {/* Override Warning Dialog */}
+      {showOverrideWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Override Claims Data?
+            </h3>
+            <div className="space-y-3 mb-6">
+              <p className="text-sm text-gray-700">
+                You're trying to change the biologic to <strong>{pendingBiologicChange}</strong>,
+                but claims data shows the patient is currently on <strong>{claimsBiologic?.drugName}</strong>.
+              </p>
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+                <p className="text-xs text-yellow-800">
+                  <strong>Claims data (last fill {claimsBiologic && new Date(claimsBiologic.lastFillDate).toLocaleDateString()}):</strong>
+                  <br />
+                  {claimsBiologic?.drugName} {claimsBiologic?.dose} {claimsBiologic?.frequency}
+                </p>
+              </div>
+              <p className="text-sm text-gray-600">
+                Do you want to override the claims data for this patient?
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={cancelOverride}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              >
+                No, Keep Claims Data
+              </button>
+              <button
+                onClick={confirmOverride}
+                className="flex-1 px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+              >
+                Yes, Override
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
