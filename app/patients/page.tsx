@@ -1,36 +1,66 @@
-import { prisma } from '@/lib/db';
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ChevronRight, User, Edit, Trash2 } from 'lucide-react';
+import { ChevronRight, User, Edit, Filter } from 'lucide-react';
 import DeletePatientButton from './DeletePatientButton';
 import { getCurrentBiologicFromClaims } from '@/lib/claims-biologic-service';
 
-export default async function PatientsPage() {
-  const patients = await prisma.patient.findMany({
-    include: {
-      currentBiologics: true,
-      plan: true,
-      claims: {
-        orderBy: { fillDate: 'desc' },
-        take: 5, // Get recent claims for biologic inference
-      },
-      assessments: {
-        orderBy: { assessedAt: 'desc' },
-        take: 1,
-      },
-    },
-    orderBy: [
-      { lastName: 'asc' },
-      { firstName: 'asc' },
-    ],
-  });
+export default function PatientsPage() {
+  const [patients, setPatients] = useState<any[]>([]);
+  const [showHighCostOnly, setShowHighCostOnly] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchPatients();
+  }, []);
+
+  const fetchPatients = async () => {
+    try {
+      const res = await fetch('/api/patients?includeDetails=true');
+      const data = await res.json();
+      setPatients(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+      setPatients([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter patients based on cost designation
+  const filteredPatients = showHighCostOnly
+    ? patients.filter(p => p.costDesignation === 'HIGH_COST')
+    : patients;
+
+  const highCostCount = patients.filter(p => p.costDesignation === 'HIGH_COST').length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-4">
         <h1>Patients</h1>
         <Link href="/assess" className="btn btn-primary">
           New Assessment
         </Link>
+      </div>
+
+      {/* Filter Toggle */}
+      <div className="mb-6 flex items-center gap-4">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showHighCostOnly}
+            onChange={(e) => setShowHighCostOnly(e.target.checked)}
+            className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+          />
+          <span className="text-sm font-medium text-gray-700">
+            <Filter className="w-4 h-4 inline mr-1" />
+            Show High Cost Patients Only
+          </span>
+        </label>
+        <span className="text-xs text-gray-500">
+          ({highCostCount} high cost / {patients.length} total)
+        </span>
       </div>
 
       <div className="card">
@@ -49,7 +79,19 @@ export default async function PatientsPage() {
               </tr>
             </thead>
             <tbody>
-              {patients.map((patient) => {
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-12">
+                    <div className="flex items-center justify-center gap-2 text-gray-500">
+                      <svg className="spinner w-5 h-5" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Loading patients...
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredPatients.map((patient) => {
                 // PRIMARY SOURCE: Claims data (most recent fill with NDC)
                 const claimsBiologic = getCurrentBiologicFromClaims(patient.claims);
 
@@ -173,12 +215,23 @@ export default async function PatientsPage() {
             </tbody>
           </table>
 
-          {patients.length === 0 && (
+          {!loading && filteredPatients.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-gray-500 mb-4">No patients found</p>
-              <p className="text-sm text-gray-400">
-                Upload patient eligibility data in the admin panel to get started
-              </p>
+              {patients.length === 0 ? (
+                <>
+                  <p className="text-gray-500 mb-4">No patients found</p>
+                  <p className="text-sm text-gray-400">
+                    Upload patient eligibility data in the admin panel to get started
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-gray-500 mb-4">No high cost patients found</p>
+                  <p className="text-sm text-gray-400">
+                    Try disabling the "Show High Cost Patients Only" filter
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>

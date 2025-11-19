@@ -1,86 +1,70 @@
 # Database Migration Instructions
 
-## Dataset Tracking System Migration
+## Add Biologic Override Tracking Fields
 
-A database migration is required to add the dataset tracking functionality.
+This migration adds override tracking to the `CurrentBiologic` table to support claims-based biologic auto-population.
 
-### Quick Start (For Existing Database)
+### Option 1: Using the Migration Script (Recommended)
 
-If you get error **P3005: "The database schema is not empty"**, your database exists but has no migration history. Use this approach:
+1. **Set your DATABASE_URL environment variable:**
+   ```bash
+   export DATABASE_URL='postgresql://username:password@host:port/database'
+   ```
 
-```bash
-# Run the automated script
-./apply-migration.sh
+2. **Run the migration script:**
+   ```bash
+   ./scripts/migrate-biologic-override.sh
+   ```
 
-# OR run commands manually:
-npx prisma db push --skip-generate
-npx prisma migrate resolve --applied 20250109000000_add_dataset_tracking_fields
-```
+### Option 2: Using Prisma DB Push
 
-### Quick Start (For New Database)
-
-If your database is empty:
-
-```bash
-npx prisma migrate deploy
-```
-
-### What This Migration Does
-
-The migration adds the following fields to support dataset tracking:
-
-1. **UploadLog table**:
-   - `datasetLabel` (TEXT, nullable) - User-provided label for datasets
-   - `planId` (TEXT, nullable) - Links formulary uploads to InsurancePlan
-
-2. **FormularyDrug table**:
-   - `uploadLogId` (TEXT, nullable) - Links each drug to its upload dataset
-
-3. **PharmacyClaim table**:
-   - `uploadLogId` (TEXT, nullable) - Links each claim to its upload dataset
-
-4. **Indexes** for query performance on dataset lookups
-
-5. **Foreign Keys** to maintain referential integrity
-
-### Manual Migration (if needed)
-
-If you need to apply the migration manually:
+If your DATABASE_URL is already configured in your `.env` file:
 
 ```bash
-# Connect to your PostgreSQL database
-psql $DATABASE_URL
-
-# Run the migration SQL
-\i prisma/migrations/20250109000000_add_dataset_tracking_fields/migration.sql
+npx prisma db push
 ```
 
-### Verification
+This will automatically sync your Prisma schema to the database.
 
-After running the migration, verify it worked:
+### Option 3: Manual SQL Execution
+
+Connect to your PostgreSQL database and run:
+
+```sql
+ALTER TABLE "CurrentBiologic"
+ADD COLUMN IF NOT EXISTS "isManualOverride" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN IF NOT EXISTS "claimsDrugName" TEXT,
+ADD COLUMN IF NOT EXISTS "claimsDose" TEXT,
+ADD COLUMN IF NOT EXISTS "claimsFrequency" TEXT;
+```
+
+### Option 4: Using psql Command Directly
 
 ```bash
-npx prisma db pull
+psql "$DATABASE_URL" -f prisma/migrations/add_biologic_override_tracking.sql
 ```
 
-This should match your current `schema.prisma` file.
+## Verify Migration
 
-### Troubleshooting
+After running the migration, verify the columns were added:
 
-**If migration fails due to existing columns:**
-The migration uses `IF NOT EXISTS` clauses, so it's safe to run multiple times.
-
-**If you see "column already exists" errors:**
-The columns may have been added manually. You can mark the migration as applied:
-
-```bash
-npx prisma migrate resolve --applied 20250109000000_add_dataset_tracking_fields
+```sql
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_name = 'CurrentBiologic'
+AND column_name IN ('isManualOverride', 'claimsDrugName', 'claimsDose', 'claimsFrequency');
 ```
 
-### After Migration
+You should see 4 new columns.
 
-Once the migration is applied, the application will support:
-- Multiple formulary versions per insurance plan
-- Dataset labeling and management
-- View/download datasets as CSV
-- Automatic selection of most recent formulary for recommendations
+## Troubleshooting
+
+**"DATABASE_URL not found"**
+- Make sure you've set the environment variable or have a `.env` file with `DATABASE_URL`
+
+**"psql: command not found"**
+- Install PostgreSQL client tools or use Option 2 (Prisma DB Push)
+
+**"Permission denied"**
+- For the script: Run `chmod +x scripts/migrate-biologic-override.sh`
+- For database: Ensure your user has ALTER TABLE permissions

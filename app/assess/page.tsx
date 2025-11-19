@@ -10,6 +10,7 @@ interface Patient {
   firstName: string;
   lastName: string;
   externalId: string | null;
+  costDesignation?: 'HIGH_COST' | 'LOW_COST' | null;
 }
 
 export default function AssessmentPage() {
@@ -19,6 +20,7 @@ export default function AssessmentPage() {
   const [claimsBiologic, setClaimsBiologic] = useState<any>(null); // Biologic from claims data
   const [showOverrideWarning, setShowOverrideWarning] = useState(false);
   const [pendingBiologicChange, setPendingBiologicChange] = useState<string | null>(null);
+  const [showHighCostOnly, setShowHighCostOnly] = useState(false); // Filter for high cost patients
 
   const [formData, setFormData] = useState({
     patientId: '',
@@ -244,6 +246,25 @@ export default function AssessmentPage() {
         {/* Patient Selection */}
         <div>
           <label className="label">Patient *</label>
+
+          {/* High Cost Filter Checkbox */}
+          <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showHighCostOnly}
+                onChange={(e) => setShowHighCostOnly(e.target.checked)}
+                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+              />
+              <span className="text-sm font-medium text-amber-900">
+                Show High Cost Patients Only
+              </span>
+            </label>
+            <p className="text-xs text-amber-700 mt-1 ml-6">
+              Only high cost patients are eligible for this optimization service
+            </p>
+          </div>
+
           <select
             className="input w-full"
             value={formData.patientId}
@@ -251,11 +272,16 @@ export default function AssessmentPage() {
             required
           >
             <option value="">Select a patient</option>
-            {Array.isArray(patients) && patients.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.firstName} {p.lastName} {p.externalId ? `(${p.externalId})` : ''}
-              </option>
-            ))}
+            {Array.isArray(patients) &&
+              patients
+                .filter(p => !showHighCostOnly || p.costDesignation === 'HIGH_COST')
+                .map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.firstName} {p.lastName} {p.externalId ? `(${p.externalId})` : ''}
+                    {p.costDesignation === 'HIGH_COST' ? ' [HIGH COST]' : ''}
+                  </option>
+                ))
+            }
           </select>
           <p className="text-xs text-gray-500 mt-1">
             Auto-fills claims data, health plan, and formulary information
