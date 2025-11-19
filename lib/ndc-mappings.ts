@@ -18,6 +18,7 @@ export const biologicNdcMappings = [
   { ndcCode: '0002-7529-02', drugName: 'Humira', genericName: 'adalimumab', drugClass: 'TNF_INHIBITOR', strength: '10mg/0.2mL', dosageForm: 'Syringe' },
   { ndcCode: '0002-7811-03', drugName: 'Humira', genericName: 'adalimumab', drugClass: 'TNF_INHIBITOR', strength: '20mg/0.4mL', dosageForm: 'Pen' },
   { ndcCode: '0002-7811-04', drugName: 'Humira', genericName: 'adalimumab', drugClass: 'TNF_INHIBITOR', strength: '20mg/0.4mL', dosageForm: 'Pen' },
+  { ndcCode: '0074-4339-02', drugName: 'Humira', genericName: 'adalimumab', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.4mL', dosageForm: 'Syringe' },
 
   // HYRIMOZ (adalimumab-adaz biosimilar) - Sandoz
   { ndcCode: '0781-3049-94', drugName: 'Hyrimoz', genericName: 'adalimumab-adaz', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
@@ -32,10 +33,15 @@ export const biologicNdcMappings = [
   { ndcCode: '55513-0952-02', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Autoinjector' },
   { ndcCode: '55513-0954-01', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '80mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '55513-0954-02', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '80mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '55513-400-01', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '55513-411-01', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Autoinjector' },
 
   // CYLTEZO (adalimumab-adbm biosimilar) - Boehringer Ingelheim
   { ndcCode: '0597-0140-02', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '0597-0141-02', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
+  { ndcCode: '0597-0375-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '0597-0495-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '0597-0545-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
 
   // HADLIMA (adalimumab-bwwd biosimilar) - Samsung Bioepis
   { ndcCode: '66215-0501-02', drugName: 'Hadlima', genericName: 'adalimumab-bwwd', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
@@ -48,10 +54,17 @@ export const biologicNdcMappings = [
   // YUFLYMA (adalimumab-aaty biosimilar) - Celltrion
   { ndcCode: '70010-0040-02', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '70010-0041-02', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
+  { ndcCode: '72606-022-01', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '72606-030-01', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
+  { ndcCode: '72606-025-01', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
 
   // YUSIMRY (adalimumab-aqvh biosimilar) - Coherus
   { ndcCode: '69452-0401-02', drugName: 'Yusimry', genericName: 'adalimumab-aqvh', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '69452-0402-02', drugName: 'Yusimry', genericName: 'adalimumab-aqvh', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
+
+  // SIMLANDI (adalimumab-ryvk biosimilar) - Teva
+  { ndcCode: '51759-402-01', drugName: 'Simlandi', genericName: 'adalimumab-ryvk', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '51759-402-02', drugName: 'Simlandi', genericName: 'adalimumab-ryvk', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
 
   // ENBREL (etanercept) - Amgen
   { ndcCode: '58406-0435-34', drugName: 'Enbrel', genericName: 'etanercept', drugClass: 'TNF_INHIBITOR', strength: '50mg/mL', dosageForm: 'Syringe' },
@@ -74,6 +87,10 @@ export const biologicNdcMappings = [
   // CIMZIA (certolizumab pegol) - UCB
   { ndcCode: '50474-0700-01', drugName: 'Cimzia', genericName: 'certolizumab pegol', drugClass: 'TNF_INHIBITOR', strength: '200mg/mL', dosageForm: 'Syringe' },
   { ndcCode: '50474-0700-02', drugName: 'Cimzia', genericName: 'certolizumab pegol', drugClass: 'TNF_INHIBITOR', strength: '200mg/mL', dosageForm: 'Syringe' },
+
+  // REMICADE/Infliximab (infliximab) - Janssen
+  { ndcCode: '57894-160-01', drugName: 'Remicade', genericName: 'infliximab', drugClass: 'TNF_INHIBITOR', strength: '100mg', dosageForm: 'Vial' },
+  { ndcCode: '57894-160-02', drugName: 'Remicade', genericName: 'infliximab', drugClass: 'TNF_INHIBITOR', strength: '100mg', dosageForm: 'Vial' },
 
   // ========================================
   // IL-17 INHIBITORS
@@ -115,6 +132,7 @@ export const biologicNdcMappings = [
   { ndcCode: '0074-0555-71', drugName: 'Skyrizi', genericName: 'risankizumab-rzaa', drugClass: 'IL23_INHIBITOR', strength: '150mg/mL', dosageForm: 'Pen' },
   { ndcCode: '0074-0555-72', drugName: 'Skyrizi', genericName: 'risankizumab-rzaa', drugClass: 'IL23_INHIBITOR', strength: '150mg/mL', dosageForm: 'Pen' },
   { ndcCode: '0074-0773-01', drugName: 'Skyrizi', genericName: 'risankizumab-rzaa', drugClass: 'IL23_INHIBITOR', strength: '360mg/2.4mL', dosageForm: 'Pen' },
+  { ndcCode: '0074-5015-01', drugName: 'Skyrizi', genericName: 'risankizumab-rzaa', drugClass: 'IL23_INHIBITOR', strength: '600mg/10mL', dosageForm: 'IV Infusion' },
 
   // ILUMYA (tildrakizumab-asmn) - Sun Pharma
   { ndcCode: '47335-0925-83', drugName: 'Ilumya', genericName: 'tildrakizumab-asmn', drugClass: 'IL23_INHIBITOR', strength: '100mg/mL', dosageForm: 'Syringe' },
