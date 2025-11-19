@@ -18,6 +18,7 @@ export const biologicNdcMappings = [
   { ndcCode: '0002-7529-02', drugName: 'Humira', genericName: 'adalimumab', drugClass: 'TNF_INHIBITOR', strength: '10mg/0.2mL', dosageForm: 'Syringe' },
   { ndcCode: '0002-7811-03', drugName: 'Humira', genericName: 'adalimumab', drugClass: 'TNF_INHIBITOR', strength: '20mg/0.4mL', dosageForm: 'Pen' },
   { ndcCode: '0002-7811-04', drugName: 'Humira', genericName: 'adalimumab', drugClass: 'TNF_INHIBITOR', strength: '20mg/0.4mL', dosageForm: 'Pen' },
+  { ndcCode: '0074-4339-02', drugName: 'Humira', genericName: 'adalimumab', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.4mL', dosageForm: 'Syringe' },
 
   // HYRIMOZ (adalimumab-adaz biosimilar) - Sandoz
   { ndcCode: '0781-3049-94', drugName: 'Hyrimoz', genericName: 'adalimumab-adaz', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
@@ -32,10 +33,15 @@ export const biologicNdcMappings = [
   { ndcCode: '55513-0952-02', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Autoinjector' },
   { ndcCode: '55513-0954-01', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '80mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '55513-0954-02', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '80mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '55513-400-01', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '55513-411-01', drugName: 'Amjevita', genericName: 'adalimumab-atto', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Autoinjector' },
 
   // CYLTEZO (adalimumab-adbm biosimilar) - Boehringer Ingelheim
   { ndcCode: '0597-0140-02', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '0597-0141-02', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
+  { ndcCode: '0597-0375-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '0597-0495-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '0597-0545-01', drugName: 'Cyltezo', genericName: 'adalimumab-adbm', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
 
   // HADLIMA (adalimumab-bwwd biosimilar) - Samsung Bioepis
   { ndcCode: '66215-0501-02', drugName: 'Hadlima', genericName: 'adalimumab-bwwd', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
@@ -48,10 +54,17 @@ export const biologicNdcMappings = [
   // YUFLYMA (adalimumab-aaty biosimilar) - Celltrion
   { ndcCode: '70010-0040-02', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '70010-0041-02', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
+  { ndcCode: '72606-022-01', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '72606-030-01', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
+  { ndcCode: '72606-025-01', drugName: 'Yuflyma', genericName: 'adalimumab-aaty', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
 
   // YUSIMRY (adalimumab-aqvh biosimilar) - Coherus
   { ndcCode: '69452-0401-02', drugName: 'Yusimry', genericName: 'adalimumab-aqvh', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
   { ndcCode: '69452-0402-02', drugName: 'Yusimry', genericName: 'adalimumab-aqvh', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Pen' },
+
+  // SIMLANDI (adalimumab-ryvk biosimilar) - Teva
+  { ndcCode: '51759-402-01', drugName: 'Simlandi', genericName: 'adalimumab-ryvk', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
+  { ndcCode: '51759-402-02', drugName: 'Simlandi', genericName: 'adalimumab-ryvk', drugClass: 'TNF_INHIBITOR', strength: '40mg/0.8mL', dosageForm: 'Syringe' },
 
   // ENBREL (etanercept) - Amgen
   { ndcCode: '58406-0435-34', drugName: 'Enbrel', genericName: 'etanercept', drugClass: 'TNF_INHIBITOR', strength: '50mg/mL', dosageForm: 'Syringe' },
@@ -74,6 +87,10 @@ export const biologicNdcMappings = [
   // CIMZIA (certolizumab pegol) - UCB
   { ndcCode: '50474-0700-01', drugName: 'Cimzia', genericName: 'certolizumab pegol', drugClass: 'TNF_INHIBITOR', strength: '200mg/mL', dosageForm: 'Syringe' },
   { ndcCode: '50474-0700-02', drugName: 'Cimzia', genericName: 'certolizumab pegol', drugClass: 'TNF_INHIBITOR', strength: '200mg/mL', dosageForm: 'Syringe' },
+
+  // REMICADE/Infliximab (infliximab) - Janssen
+  { ndcCode: '57894-160-01', drugName: 'Remicade', genericName: 'infliximab', drugClass: 'TNF_INHIBITOR', strength: '100mg', dosageForm: 'Vial' },
+  { ndcCode: '57894-160-02', drugName: 'Remicade', genericName: 'infliximab', drugClass: 'TNF_INHIBITOR', strength: '100mg', dosageForm: 'Vial' },
 
   // ========================================
   // IL-17 INHIBITORS
@@ -115,6 +132,7 @@ export const biologicNdcMappings = [
   { ndcCode: '0074-0555-71', drugName: 'Skyrizi', genericName: 'risankizumab-rzaa', drugClass: 'IL23_INHIBITOR', strength: '150mg/mL', dosageForm: 'Pen' },
   { ndcCode: '0074-0555-72', drugName: 'Skyrizi', genericName: 'risankizumab-rzaa', drugClass: 'IL23_INHIBITOR', strength: '150mg/mL', dosageForm: 'Pen' },
   { ndcCode: '0074-0773-01', drugName: 'Skyrizi', genericName: 'risankizumab-rzaa', drugClass: 'IL23_INHIBITOR', strength: '360mg/2.4mL', dosageForm: 'Pen' },
+  { ndcCode: '0074-5015-01', drugName: 'Skyrizi', genericName: 'risankizumab-rzaa', drugClass: 'IL23_INHIBITOR', strength: '600mg/10mL', dosageForm: 'IV Infusion' },
 
   // ILUMYA (tildrakizumab-asmn) - Sun Pharma
   { ndcCode: '47335-0925-83', drugName: 'Ilumya', genericName: 'tildrakizumab-asmn', drugClass: 'IL23_INHIBITOR', strength: '100mg/mL', dosageForm: 'Syringe' },
@@ -225,17 +243,61 @@ export const diagnosisCodes = {
   'L25.9': 'Unspecified contact dermatitis, unspecified cause',
 };
 
+// Helper function to normalize NDC segment (pad with leading zeros)
+function normalizeNdcSegment(segment: string, targetLength: number): string {
+  return segment.padStart(targetLength, '0');
+}
+
 // Helper function to find drug info by NDC code
 export function findDrugByNdc(ndcCode: string) {
-  // Normalize NDC code (remove dashes, handle different formats)
-  const normalizedNdc = ndcCode.replace(/[-\s]/g, '');
+  if (!ndcCode) return undefined;
 
-  return biologicNdcMappings.find(mapping => {
+  // NDC codes have 3 segments: Labeler-Product-Package
+  // Package codes can vary for same drug (different sizes), so match on first 2 segments
+
+  const cleanCode = ndcCode.trim();
+  const parts = cleanCode.split('-');
+
+  if (parts.length >= 2) {
+    // Normalize the NDC parts to standard 5-4-2 format for comparison
+    // Labeler: 5 digits, Product: 4 digits
+    const normalizedLabeler = normalizeNdcSegment(parts[0], 5);
+    const normalizedProduct = normalizeNdcSegment(parts[1], 4);
+    const searchPrefix = `${normalizedLabeler}${normalizedProduct}`;
+
+    // Find match by comparing normalized labeler + product codes
+    const match = biologicNdcMappings.find(mapping => {
+      const mappingParts = mapping.ndcCode.split('-');
+      if (mappingParts.length < 2) return false;
+
+      const mappingLabeler = normalizeNdcSegment(mappingParts[0], 5);
+      const mappingProduct = normalizeNdcSegment(mappingParts[1], 4);
+      const mappingPrefix = `${mappingLabeler}${mappingProduct}`;
+
+      return mappingPrefix === searchPrefix;
+    });
+
+    if (match) {
+      console.log(`✅ NDC Match: ${cleanCode} → ${match.drugName} (${match.genericName})`);
+      return match;
+    }
+  }
+
+  // Fallback: Try exact match after removing all non-alphanumeric characters
+  const normalizedNdc = cleanCode.replace(/[-\s]/g, '');
+
+  const exactMatch = biologicNdcMappings.find(mapping => {
     const normalizedMappingNdc = mapping.ndcCode.replace(/[-\s]/g, '');
-    return normalizedMappingNdc === normalizedNdc ||
-           normalizedMappingNdc.startsWith(normalizedNdc) ||
-           normalizedNdc.startsWith(normalizedMappingNdc);
+    return normalizedMappingNdc === normalizedNdc;
   });
+
+  if (exactMatch) {
+    console.log(`✅ NDC Exact Match: ${cleanCode} → ${exactMatch.drugName}`);
+    return exactMatch;
+  }
+
+  console.log(`❌ NDC Not Found: ${cleanCode} (no match in biologic mappings)`);
+  return undefined;
 }
 
 // Helper function to get diagnosis description
