@@ -74,28 +74,75 @@ export default function DataManagementPage() {
       if (activeTab === 'plans') {
         res = await fetch('/api/insurance-plans');
         data = await res.json();
-        setPlans(data);
+        // Handle error responses
+        if (!res.ok || data.error) {
+          console.error('Error fetching plans:', data.error);
+          setPlans([]);
+          return;
+        }
+        setPlans(Array.isArray(data) ? data : []);
       } else {
         res = await fetch(`/api/admin/data?type=${activeTab}`);
         data = await res.json();
 
+        // Handle error responses - API might return {error: "..."} instead of array
+        if (!res.ok || data.error) {
+          console.error(`Error fetching ${activeTab}:`, data.error);
+          // Set empty array for the current tab
+          switch (activeTab) {
+            case 'knowledge':
+              setKnowledge([]);
+              break;
+            case 'formulary':
+              setFormulary([]);
+              break;
+            case 'claims':
+              setClaims([]);
+              break;
+            case 'uploads':
+              setUploads([]);
+              break;
+          }
+          return;
+        }
+
+        // Ensure data is an array before setting state
+        const arrayData = Array.isArray(data) ? data : [];
         switch (activeTab) {
           case 'knowledge':
-            setKnowledge(data);
+            setKnowledge(arrayData);
             break;
           case 'formulary':
-            setFormulary(data);
+            setFormulary(arrayData);
             break;
           case 'claims':
-            setClaims(data);
+            setClaims(arrayData);
             break;
           case 'uploads':
-            setUploads(data);
+            setUploads(arrayData);
             break;
         }
       }
     } catch (error) {
       console.error('Error loading data:', error);
+      // Reset current tab's data to empty array on network errors
+      switch (activeTab) {
+        case 'knowledge':
+          setKnowledge([]);
+          break;
+        case 'formulary':
+          setFormulary([]);
+          break;
+        case 'claims':
+          setClaims([]);
+          break;
+        case 'uploads':
+          setUploads([]);
+          break;
+        case 'plans':
+          setPlans([]);
+          break;
+      }
     } finally {
       setLoading(false);
     }
