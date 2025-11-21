@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import Link from "next/link";
 import { ArrowRight, Upload, FileText, TrendingDown, MapPin } from "lucide-react";
 
