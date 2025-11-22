@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
 // Static mapping of brand names to generic names for common dermatology biologics
 const BRAND_TO_GENERIC: Record<string, string> = {
@@ -23,15 +23,15 @@ const BRAND_TO_GENERIC: Record<string, string> = {
   'orencia': 'abatacept',
 };
 
-let openai: OpenAI | null = null;
+let anthropic: Anthropic | null = null;
 
-function getOpenAIClient(): OpenAI | null {
-  if (!openai && process.env.OPENAI_API_KEY) {
-    openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+function getAnthropicClient(): Anthropic | null {
+  if (!anthropic && process.env.ANTHROPIC_API_KEY) {
+    anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
     });
   }
-  return openai;
+  return anthropic;
 }
 
 /**
@@ -53,21 +53,22 @@ export async function normalizeToGeneric(drugName: string): Promise<string> {
     return normalized;
   }
 
-  // Try LLM fallback if OpenAI is available
-  const client = getOpenAIClient();
+  // Try LLM fallback if Anthropic is available
+  const client = getAnthropicClient();
   if (client) {
     try {
-      const response = await client.chat.completions.create({
-        model: 'gpt-4o-mini',
+      const response = await client.messages.create({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 50,
+        temperature: 0,
         messages: [{
           role: 'user',
           content: `Convert this drug name to its generic name. If it's already a generic name, return it as-is. Return ONLY the generic name in lowercase, nothing else: ${drugName}`
         }],
-        max_tokens: 20,
-        temperature: 0,
       });
 
-      const genericName = response.choices[0].message.content?.toLowerCase().trim() || normalized;
+      const content = response.content[0];
+      const genericName = (content.type === 'text' ? content.text : '').toLowerCase().trim() || normalized;
       return genericName;
     } catch (error) {
       console.error('Error normalizing drug name with LLM:', error);

@@ -12,13 +12,13 @@
  *   npx ts-node scripts/extract-clinical-findings.ts path/to/papers/  # Batch process directory
  */
 
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import fs from 'fs';
 import path from 'path';
 import { prisma } from '../lib/db';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 interface ClinicalFinding {
@@ -85,14 +85,16 @@ Return ONLY a JSON object with this structure:
   ]
 }`;
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: prompt }],
-    response_format: { type: 'json_object' },
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-5-20250929',
+    max_tokens: 4096,
     temperature: 0.2,  // Low temperature for accuracy
+    system: 'You are a clinical research analyst. Always respond with valid JSON only, no other text.',
+    messages: [{ role: 'user', content: prompt }],
   });
 
-  const result = JSON.parse(response.choices[0].message.content || '{}');
+  const content = response.content[0];
+  const result = JSON.parse(content.type === 'text' ? content.text : '{}');
   return result as PaperExtraction;
 }
 
@@ -116,7 +118,7 @@ async function saveFindingsToDatabase(extraction: PaperExtraction, sourceFile: s
         indication: finding.indication,
         findingType: finding.findingType,
         sourceFile: sourceFile,
-        extractedBy: 'gpt-4o',
+        extractedBy: 'claude-sonnet-4-5-20250929',
         reviewed: false,  // Requires human review before production use
       },
     });

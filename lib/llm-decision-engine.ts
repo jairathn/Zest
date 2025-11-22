@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from './db';
 import { searchKnowledge } from './rag/embeddings';
 import { normalizeToGeneric } from './drug-normalizer';
@@ -14,14 +14,14 @@ import {
 } from '@prisma/client';
 
 // Lazy initialization to avoid build-time errors
-let _openai: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!_openai) {
-    _openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+let _anthropic: Anthropic | null = null;
+function getAnthropic(): Anthropic {
+  if (!_anthropic) {
+    _anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
     });
   }
-  return _openai;
+  return _anthropic;
 }
 
 export interface AssessmentInput {
@@ -177,15 +177,17 @@ Return ONLY a JSON object with this exact structure:
   "reasoning": "string"
 }`;
 
-  const openai = getOpenAI();
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: prompt }],
-    response_format: { type: 'json_object' },
+  const anthropic = getAnthropic();
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-5-20250929',
+    max_tokens: 1024,
     temperature: 0.3,
+    system: 'You are a clinical decision support AI. Always respond with valid JSON only, no other text.',
+    messages: [{ role: 'user', content: prompt }],
   });
 
-  const result = JSON.parse(response.choices[0].message.content || '{}');
+  const content = response.content[0];
+  const result = JSON.parse(content.type === 'text' ? content.text : '{}');
   return result as TriageResult;
 }
 
@@ -676,15 +678,17 @@ Return ONLY a JSON object with this exact structure:
 }`;
 
   try {
-    const openai = getOpenAI();
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
+    const anthropic = getAnthropic();
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 4096,
       temperature: 0.4,
+      system: 'You are a clinical decision support AI for dermatology biologic optimization. Always respond with valid JSON only, no other text.',
+      messages: [{ role: 'user', content: prompt }],
     });
 
-    const content = response.choices[0].message.content || '{}';
+    const responseContent = response.content[0];
+    const content = responseContent.type === 'text' ? responseContent.text : '{}';
     console.log('LLM Response:', content); // Debug logging
     const parsed = JSON.parse(content);
 
