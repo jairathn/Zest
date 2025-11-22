@@ -338,59 +338,6 @@ export default async function RecommendationsPage({ params }: PageProps) {
                 <p className="text-sm text-gray-700">{rec.rationale}</p>
               </div>
 
-              {/* Evidence */}
-              {rec.evidenceSources && rec.evidenceSources.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="font-semibold text-sm mb-2">Supporting Evidence</h4>
-                  <div className="space-y-3">
-                    {rec.evidenceSources.map((source, i) => {
-                      // Parse "Title (relevance: 85%): Content..." format
-                      const relevanceMatch = source.match(/^(.+?)\s*\(relevance:\s*(\d+)%\):\s*(.+)$/);
-
-                      let title: string;
-                      let relevance: number | null = null;
-                      let excerpt: string;
-
-                      if (relevanceMatch) {
-                        // New format with relevance score
-                        title = relevanceMatch[1].trim();
-                        relevance = parseInt(relevanceMatch[2]);
-                        excerpt = relevanceMatch[3].trim();
-                      } else {
-                        // Legacy format "title: content..."
-                        const colonIndex = source.indexOf(':');
-                        title = colonIndex > 0 ? source.substring(0, colonIndex).trim() : source;
-                        excerpt = colonIndex > 0 ? source.substring(colonIndex + 1).trim() : '';
-                      }
-
-                      return (
-                        <div key={i} className="p-3 bg-gray-50 rounded border border-gray-200">
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="font-medium text-sm text-gray-900">
-                              📄 {title}
-                            </div>
-                            {relevance !== null && (
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                                relevance >= 80 ? 'bg-primary-100 text-primary-800' :
-                                relevance >= 70 ? 'bg-primary-50 text-primary-700' :
-                                'bg-gray-100 text-gray-600'
-                              }`}>
-                                {relevance}% relevant
-                              </span>
-                            )}
-                          </div>
-                          {excerpt && (
-                            <p className="text-xs text-gray-600 italic">
-                              &quot;{excerpt}&quot;
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
               {/* Monitoring Plan */}
               {rec.monitoringPlan && (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
