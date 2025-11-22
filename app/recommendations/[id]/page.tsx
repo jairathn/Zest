@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { AlertCircle, TrendingDown, DollarSign, FileText } from 'lucide-react';
+import { Suspense } from 'react';
+import ContraindicatedDrugsToggle from './ContraindicatedDrugsToggle';
 
 interface PageProps {
   params: { id: string };
@@ -73,31 +75,136 @@ export default async function RecommendationsPage({ params }: PageProps) {
       })
     : [];
 
-  // Filter out contraindicated drugs from formulary reference
-  const filterContraindicated = (drugs: any[], contraindications: any[]) => {
-    if (contraindications.length === 0) return drugs;
+  // Comprehensive contraindication checking with reasons
+  const checkContraindications = (drugs: any[], contraindications: any[]) => {
+    if (contraindications.length === 0) {
+      return { safe: drugs, contraindicated: [] };
+    }
 
-    const contraindicationTypes = contraindications.map(c => c.type);
+    const safe: any[] = [];
+    const contraindicated: any[] = [];
 
-    return drugs.filter(drug => {
-      // TNF inhibitors contraindicated in CHF and MS
-      if (drug.drugClass && drug.drugClass.includes('TNF')) {
-        if (contraindicationTypes.includes('HEART_FAILURE')) return false;
-        if (contraindicationTypes.includes('MULTIPLE_SCLEROSIS')) return false;
+    for (const drug of drugs) {
+      const normalizedDrugClass = drug.drugClass?.toUpperCase().replace(/\s+/g, '_') || '';
+      const reasons: Array<{ type: string; severity: 'ABSOLUTE' | 'RELATIVE'; reason: string; details?: string }> = [];
+
+      for (const ci of contraindications) {
+        const ciType = ci.type;
+
+        // TNF INHIBITORS
+        if (normalizedDrugClass.includes('TNF')) {
+          if (ciType === 'HEART_FAILURE') {
+            reasons.push({
+              type: ciType,
+              severity: 'ABSOLUTE',
+              reason: 'TNF inhibitors can worsen heart failure and increase mortality',
+              details: ci.details
+            });
+          }
+          if (ciType === 'MULTIPLE_SCLEROSIS' || ciType === 'DEMYELINATING_DISEASE') {
+            reasons.push({
+              type: ciType,
+              severity: 'ABSOLUTE',
+              reason: 'TNF inhibitors can exacerbate demyelinating diseases',
+              details: ci.details
+            });
+          }
+          if (ciType === 'LYMPHOMA') {
+            reasons.push({
+              type: ciType,
+              severity: 'RELATIVE',
+              reason: 'History of lymphoma - TNF inhibitors may increase recurrence risk. Consider risk/benefit with oncology.',
+              details: ci.details
+            });
+          }
+          if (ciType === 'MALIGNANCY') {
+            reasons.push({
+              type: ciType,
+              severity: 'RELATIVE',
+              reason: 'Active or recent malignancy - TNF inhibitors may affect tumor surveillance. Discuss with oncology.',
+              details: ci.details
+            });
+          }
+          if (ciType === 'HEPATITIS_B') {
+            reasons.push({
+              type: ciType,
+              severity: 'RELATIVE',
+              reason: 'Hepatitis B can reactivate with TNF inhibitors. Requires antiviral prophylaxis and monitoring.',
+              details: ci.details
+            });
+          }
+          if (ciType === 'ACTIVE_TUBERCULOSIS' || ciType === 'LATENT_TUBERCULOSIS') {
+            reasons.push({
+              type: ciType,
+              severity: ciType === 'ACTIVE_TUBERCULOSIS' ? 'ABSOLUTE' : 'RELATIVE',
+              reason: ciType === 'ACTIVE_TUBERCULOSIS'
+                ? 'Active TB must be treated before starting any biologic, especially TNF inhibitors.'
+                : 'Latent TB requires prophylactic treatment before starting TNF inhibitor.',
+              details: ci.details
+            });
+          }
+        }
+
+        // JAK INHIBITORS
+        if (normalizedDrugClass.includes('JAK') || normalizedDrugClass.includes('TYK2')) {
+          if (ciType === 'THROMBOSIS' || ciType === 'VENOUS_THROMBOEMBOLISM') {
+            reasons.push({
+              type: ciType,
+              severity: 'ABSOLUTE',
+              reason: 'JAK inhibitors significantly increase VTE risk. Contraindicated in patients with thrombosis history.',
+              details: ci.details
+            });
+          }
+          if (ciType === 'CARDIOVASCULAR_DISEASE') {
+            reasons.push({
+              type: ciType,
+              severity: 'RELATIVE',
+              reason: 'JAK inhibitors increase MACE risk. Consider in patients >50 with CV risk factors. Monitor closely.',
+              details: ci.details
+            });
+          }
+        }
+
+        // IL-17 INHIBITORS
+        if (normalizedDrugClass.includes('IL17') || normalizedDrugClass.includes('IL-17')) {
+          if (ciType === 'INFLAMMATORY_BOWEL_DISEASE') {
+            reasons.push({
+              type: ciType,
+              severity: 'RELATIVE',
+              reason: 'IL-17 inhibitors can worsen or trigger IBD. Use with caution and GI consultation.',
+              details: ci.details
+            });
+          }
+        }
+
+        // ALL BIOLOGICS
+        if (ciType === 'ACTIVE_INFECTION') {
+          reasons.push({
+            type: ciType,
+            severity: 'ABSOLUTE',
+            reason: 'Active infection must be treated before starting any biologic therapy.',
+            details: ci.details
+          });
+        }
+        if (ciType === 'PREGNANCY') {
+          reasons.push({
+            type: ciType,
+            severity: 'RELATIVE',
+            reason: 'Pregnancy requires careful risk/benefit assessment. Some biologics are safer than others. Consult maternal-fetal medicine.',
+            details: ci.details
+          });
+        }
       }
 
-      // IL-17 inhibitors can worsen IBD
-      if (drug.drugClass && drug.drugClass.includes('IL-17')) {
-        if (contraindicationTypes.includes('INFLAMMATORY_BOWEL_DISEASE')) return false;
+      // Categorize
+      if (reasons.length === 0) {
+        safe.push(drug);
+      } else {
+        contraindicated.push({ drug, reasons });
       }
+    }
 
-      // All biologics contraindicated in active infection
-      if (contraindicationTypes.includes('ACTIVE_INFECTION')) {
-        return false;
-      }
-
-      return true;
-    });
+    return { safe, contraindicated };
   };
 
   // Filter drugs by diagnosis indication
@@ -126,7 +233,7 @@ export default async function RecommendationsPage({ params }: PageProps) {
     fetchedFormularyDrugs,
     assessment.diagnosis
   );
-  const safeFormularyDrugs = filterContraindicated(
+  const { safe: safeFormularyDrugs, contraindicated: contraindicatedFormularyDrugs } = checkContraindications(
     diagnosisAppropriateDrugs,
     assessment.patient.contraindications
   );
@@ -456,6 +563,12 @@ export default async function RecommendationsPage({ params }: PageProps) {
           </div>
         </div>
       )}
+
+      {/* Contraindicated Drugs Toggle */}
+      <ContraindicatedDrugsToggle
+        contraindicatedDrugs={contraindicatedFormularyDrugs}
+        diagnosis={assessment.diagnosis}
+      />
     </div>
   );
 }
