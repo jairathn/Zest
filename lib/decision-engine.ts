@@ -11,6 +11,15 @@ import {
   DiagnosisType,
 } from '@prisma/client';
 
+/**
+ * Convert string requiresPA value to boolean
+ * FormularyDrug stores as String ("Yes", "No", "N/A", "Unknown")
+ * Recommendation stores as Boolean
+ */
+function convertRequiresPAToBoolean(requiresPA: string | null | undefined): boolean {
+  return requiresPA === 'Yes';
+}
+
 export interface AssessmentInput {
   patientId: string;
   diagnosis: DiagnosisType;
@@ -45,7 +54,7 @@ export interface RecommendationOutput {
   evidenceSources: string[];
   monitoringPlan?: string;
   tier?: number;
-  requiresPA?: string | boolean;
+  requiresPA?: boolean;
   contraindicated: boolean;
   contraindicationReason?: string;
 }
@@ -279,7 +288,7 @@ export async function generateRecommendations(
       evidenceSources: [],
       monitoringPlan: `Monitor DLQI monthly. Re-assess at ${assessment.monthsStable + monthsNeeded} months for therapy optimization opportunities if stability is maintained.`,
       tier: currentFormularyDrug?.tier,
-      requiresPA: currentFormularyDrug?.requiresPA,
+      requiresPA: convertRequiresPAToBoolean(currentFormularyDrug?.requiresPA),
       contraindicated: false,
     }];
 
@@ -312,7 +321,7 @@ export async function generateRecommendations(
           evidenceSources: [],
           monitoringPlan: 'Consider this option once 6 months of sustained stability is achieved.',
           tier: alt.tier,
-          requiresPA: alt.requiresPA,
+          requiresPA: convertRequiresPAToBoolean(alt.requiresPA),
           contraindicated: false,
         });
       }
@@ -331,7 +340,7 @@ export async function generateRecommendations(
       evidenceSources: [],
       monitoringPlan: 'Consider this option once 6 months of sustained stability is achieved.',
       tier: currentFormularyDrug?.tier,
-      requiresPA: currentFormularyDrug?.requiresPA,
+      requiresPA: convertRequiresPAToBoolean(currentFormularyDrug?.requiresPA),
       contraindicated: false,
     });
 
@@ -408,7 +417,7 @@ export async function generateRecommendations(
         evidenceSources: [],
         monitoringPlan: 'Close monitoring required. Assess DLQI monthly for first 3 months. Be prepared to resume standard dosing if disease activity increases.',
         tier: currentFormularyDrug?.tier,
-        requiresPA: currentFormularyDrug?.requiresPA,
+        requiresPA: convertRequiresPAToBoolean(currentFormularyDrug?.requiresPA),
         contraindicated: false,
       });
     }
@@ -425,7 +434,7 @@ export async function generateRecommendations(
         evidenceSources: [],
         monitoringPlan: 'Monitor DLQI quarterly. Patient may prefer to maintain current stable regimen.',
         tier: currentFormularyDrug?.tier,
-        requiresPA: currentFormularyDrug?.requiresPA,
+        requiresPA: convertRequiresPAToBoolean(currentFormularyDrug?.requiresPA),
         contraindicated: false,
       });
     }
@@ -453,7 +462,7 @@ export async function generateRecommendations(
       evidenceSources: doseReductionEvidence.map(e => e.title),
       monitoringPlan: 'Close monitoring required. Assess DLQI monthly for first 3 months, then quarterly. Be prepared to resume standard dosing if disease activity increases.',
       tier: currentFormularyDrug?.tier,
-      requiresPA: currentFormularyDrug?.requiresPA,
+      requiresPA: convertRequiresPAToBoolean(currentFormularyDrug?.requiresPA),
       contraindicated: false,
     });
 
@@ -468,7 +477,7 @@ export async function generateRecommendations(
       evidenceSources: [],
       monitoringPlan: 'Monitor DLQI quarterly. Continue current therapy if patient and provider prefer maintaining status quo.',
       tier: currentFormularyDrug?.tier,
-      requiresPA: currentFormularyDrug?.requiresPA,
+      requiresPA: convertRequiresPAToBoolean(currentFormularyDrug?.requiresPA),
       contraindicated: false,
     });
 
@@ -492,7 +501,7 @@ export async function generateRecommendations(
         evidenceSources: [],
         monitoringPlan: 'Assess DLQI at 3 and 6 months post-switch to ensure maintained control.',
         tier: biosim.tier,
-        requiresPA: biosim.requiresPA,
+        requiresPA: convertRequiresPAToBoolean(biosim.requiresPA),
         contraindicated: false,
       });
     } else {
@@ -509,7 +518,7 @@ export async function generateRecommendations(
         evidenceSources: doseReductionEvidence.map(e => e.title),
         monitoringPlan: 'Very close monitoring required. Assess DLQI every 2-4 weeks initially. Higher risk strategy - only for highly motivated, compliant patients.',
         tier: currentFormularyDrug?.tier,
-        requiresPA: currentFormularyDrug?.requiresPA,
+        requiresPA: convertRequiresPAToBoolean(currentFormularyDrug?.requiresPA),
         contraindicated: false,
       });
     }
@@ -527,7 +536,7 @@ export async function generateRecommendations(
       evidenceSources: [],
       monitoringPlan: 'Reassess adherence barriers. Consider patient education, auto-injector training. Re-evaluate in 12 weeks.',
       tier: currentFormularyDrug?.tier,
-      requiresPA: currentFormularyDrug?.requiresPA,
+      requiresPA: convertRequiresPAToBoolean(currentFormularyDrug?.requiresPA),
       contraindicated: false,
     });
 
@@ -542,7 +551,7 @@ export async function generateRecommendations(
       evidenceSources: [],
       monitoringPlan: 'Monitor DLQI every 4 weeks. Allow adequate time for therapy to demonstrate full efficacy before considering switch.',
       tier: currentFormularyDrug?.tier,
-      requiresPA: currentFormularyDrug?.requiresPA,
+      requiresPA: convertRequiresPAToBoolean(currentFormularyDrug?.requiresPA),
       contraindicated: false,
     });
 
@@ -585,7 +594,7 @@ export async function generateRecommendations(
         evidenceSources: [],
         monitoringPlan: 'Re-evaluate need for systemic therapy change after optimizing adjunctive treatments.',
         tier: currentFormularyDrug?.tier,
-        requiresPA: currentFormularyDrug?.requiresPA,
+        requiresPA: convertRequiresPAToBoolean(currentFormularyDrug?.requiresPA),
         contraindicated: false,
       });
     }
@@ -632,7 +641,7 @@ export async function generateRecommendations(
         evidenceSources: [],
         monitoringPlan: 'Address adherence barriers. Re-evaluate in 8-12 weeks before pursuing medication switch.',
         tier: currentFormularyDrug?.tier,
-        requiresPA: currentFormularyDrug?.requiresPA,
+        requiresPA: convertRequiresPAToBoolean(currentFormularyDrug?.requiresPA),
         contraindicated: false,
       });
     }
