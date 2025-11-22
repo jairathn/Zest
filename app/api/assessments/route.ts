@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { generateRecommendations } from '@/lib/decision-engine';
+import { generateRecommendations } from '@/lib/decision-engine-fallback';
 import { generateLLMRecommendations } from '@/lib/llm-decision-engine';
 
 export async function POST(request: NextRequest) {

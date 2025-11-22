@@ -17,16 +17,60 @@ enum DiagnosisType {
 }
 
 enum ContraindicationType {
+  // Allergy/Hypersensitivity
   DRUG_ALLERGY
-  HEART_FAILURE
-  MULTIPLE_SCLEROSIS
-  INFLAMMATORY_BOWEL_DISEASE
-  ACTIVE_INFECTION
-  PREGNANCY
-  HEPATIC_IMPAIRMENT
-  RENAL_IMPAIRMENT
-  IMMUNOCOMPROMISED
+
+  // Cardiovascular
+  HEART_FAILURE               // TNF inhibitors (absolute)
+  THROMBOSIS                  // JAK inhibitors (absolute)
+  VENOUS_THROMBOEMBOLISM      // JAK inhibitors (absolute)
+  CARDIOVASCULAR_DISEASE      // JAK inhibitors (relative - increased MACE risk)
+
+  // Neurologic
+  MULTIPLE_SCLEROSIS          // TNF inhibitors (absolute)
+  DEMYELINATING_DISEASE       // TNF inhibitors (absolute)
+
+  // Gastrointestinal
+  INFLAMMATORY_BOWEL_DISEASE  // IL-17 inhibitors (relative - can worsen)
+  DIVERTICULITIS              // JAK inhibitors, IL-17 (relative - perforation risk)
+
+  // Infectious Disease
+  ACTIVE_INFECTION            // All biologics (absolute)
+  ACTIVE_TUBERCULOSIS         // All biologics, especially TNF (absolute)
+  LATENT_TUBERCULOSIS         // TNF inhibitors (relative - needs prophylaxis)
+  HEPATITIS_B                 // All biologics, especially TNF (relative - can reactivate, needs treatment)
+  HEPATITIS_C                 // Biologics (relative - monitor closely)
+  HIV                         // Biologics (relative - depends on control)
+  OPPORTUNISTIC_INFECTION     // All biologics (absolute)
+
+  // Malignancy
+  LYMPHOMA                    // TNF inhibitors (relative - history of lymphoma)
+  MALIGNANCY                  // All biologics (relative - active or recent)
+  SKIN_CANCER                 // All biologics (relative - non-melanoma)
+
+  // Hepatic/Renal
+  HEPATIC_IMPAIRMENT          // Dose adjustments needed
+  RENAL_IMPAIRMENT            // Dose adjustments needed
+
+  // Hematologic
+  CYTOPENIAS                  // JAK inhibitors, biologics (relative)
+
+  // Immunologic
+  IMMUNOCOMPROMISED           // All biologics (relative)
+  LIVE_VACCINE_RECENT         // All biologics (relative - wait period)
+
+  // Reproductive
+  PREGNANCY                   // Most biologics (relative - risk/benefit)
+  BREASTFEEDING               // Most biologics (relative - risk/benefit)
+
+  // Other
+  SURGERY_PLANNED             // All biologics (relative - hold peri-operatively)
   OTHER
+}
+
+enum ContraindicationSeverity {
+  ABSOLUTE    // Never use - unacceptable risk
+  RELATIVE    // Use with caution - may be surmountable with monitoring/treatment
 }
 
 enum RecommendationType {
@@ -218,15 +262,18 @@ model PharmacyClaim {
 }
 
 model Contraindication {
-  id         String                @id @default(cuid())
+  id         String                     @id @default(cuid())
   patientId  String
   type       ContraindicationType
+  severity   ContraindicationSeverity   @default(RELATIVE)
   details    String?
-  recordedAt DateTime              @default(now())
+  recordedAt DateTime                   @default(now())
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([patientId])
+  @@index([type])
+  @@index([severity])
 }
 
 // ============================================
@@ -284,8 +331,9 @@ model Recommendation {
   requiresPA              Boolean?
 
   // Safety
-  contraindicated         Boolean            @default(false)
+  contraindicated         Boolean                     @default(false)
   contraindicationReason  String?
+  contraindicationSeverity ContraindicationSeverity?  // ABSOLUTE or RELATIVE
 
   // Decision tracking
   status                  DecisionStatus     @default(PENDING)

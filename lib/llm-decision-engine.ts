@@ -23,6 +23,99 @@ function getAnthropic(): Anthropic {
   return _anthropic;
 }
 
+/**
+ * FDA-approved MAINTENANCE dosing for biologics
+ * Used to detect if patient is on standard, reduced, or extended dosing
+ */
+const STANDARD_MAINTENANCE_DOSING: Record<string, { interval: number; unit: 'weeks' | 'days' }> = {
+  // IL-23 Inhibitors
+  'Skyrizi': { interval: 12, unit: 'weeks' },
+  'Risankizumab': { interval: 12, unit: 'weeks' },
+  'Tremfya': { interval: 8, unit: 'weeks' },
+  'Guselkumab': { interval: 8, unit: 'weeks' },
+  'Ilumya': { interval: 12, unit: 'weeks' },
+  'Tildrakizumab': { interval: 12, unit: 'weeks' },
+
+  // IL-17 Inhibitors
+  'Cosentyx': { interval: 4, unit: 'weeks' },
+  'Secukinumab': { interval: 4, unit: 'weeks' },
+  'Taltz': { interval: 4, unit: 'weeks' },
+  'Ixekizumab': { interval: 4, unit: 'weeks' },
+  'Siliq': { interval: 1, unit: 'weeks' },
+  'Brodalumab': { interval: 1, unit: 'weeks' },
+
+  // TNF Inhibitors
+  'Humira': { interval: 2, unit: 'weeks' },
+  'Adalimumab': { interval: 2, unit: 'weeks' },
+  'Adalimumab-adbm': { interval: 2, unit: 'weeks' },
+  'Adalimumab-adaz': { interval: 2, unit: 'weeks' },
+  'Adalimumab-aaty': { interval: 2, unit: 'weeks' },
+  'Adalimumab-afzb': { interval: 2, unit: 'weeks' },
+  'Cyltezo': { interval: 2, unit: 'weeks' },
+  'Yusimry': { interval: 2, unit: 'weeks' },
+  'Hyrimoz': { interval: 2, unit: 'weeks' },
+  'Hadlima': { interval: 2, unit: 'weeks' },
+  'Abrilada': { interval: 2, unit: 'weeks' },
+  'Enbrel': { interval: 1, unit: 'weeks' },
+  'Etanercept': { interval: 1, unit: 'weeks' },
+  'Etanercept-szzs': { interval: 1, unit: 'weeks' },
+  'Erelzi': { interval: 1, unit: 'weeks' },
+  'Eticovo': { interval: 1, unit: 'weeks' },
+  'Cimzia': { interval: 2, unit: 'weeks' },
+  'Certolizumab': { interval: 2, unit: 'weeks' },
+  'Simponi': { interval: 4, unit: 'weeks' },
+  'Golimumab': { interval: 4, unit: 'weeks' },
+
+  // IL-12/23 Inhibitors
+  'Stelara': { interval: 12, unit: 'weeks' },
+  'Ustekinumab': { interval: 12, unit: 'weeks' },
+
+  // IL-4/13 Inhibitors
+  'Dupixent': { interval: 2, unit: 'weeks' },
+  'Dupilumab': { interval: 2, unit: 'weeks' },
+
+  // JAK Inhibitors (oral - daily dosing)
+  'Rinvoq': { interval: 1, unit: 'days' },
+  'Upadacitinib': { interval: 1, unit: 'days' },
+  'Sotyktu': { interval: 1, unit: 'days' },
+  'Deucravacitinib': { interval: 1, unit: 'days' },
+};
+
+/**
+ * Parse frequency string and detect dose reduction level
+ * Returns 0 (standard), 25, or 50 (percent reduction from standard)
+ */
+function getDoseReductionLevel(drugName: string, currentFrequency: string): 0 | 25 | 50 {
+  const standardDosing = STANDARD_MAINTENANCE_DOSING[drugName];
+  if (!standardDosing) {
+    return 0; // Unknown drug, assume standard dosing
+  }
+
+  const frequencyLower = currentFrequency.toLowerCase();
+  const intervalMatch = frequencyLower.match(/every\s+(\d+)\s+(week|day)/);
+  if (!intervalMatch) {
+    return 0; // Can't parse, assume standard
+  }
+
+  const currentInterval = parseInt(intervalMatch[1]);
+  const currentUnit = intervalMatch[2].includes('week') ? 'weeks' : 'days';
+
+  if (currentUnit !== standardDosing.unit) {
+    return 0; // Different units, assume standard
+  }
+
+  const standardInterval = standardDosing.interval;
+  const extensionRatio = currentInterval / standardInterval;
+
+  if (extensionRatio <= 1.15) {
+    return 0; // Within 15% of standard
+  } else if (extensionRatio <= 1.6) {
+    return 25; // 16%-60% extension ≈ 25% dose reduction
+  } else {
+    return 50; // >60% extension ≈ 50% dose reduction
+  }
+}
+
 export interface AssessmentInput {
   patientId: string;
   diagnosis: DiagnosisType;
@@ -142,40 +235,54 @@ async function triagePatient(
   assessment: AssessmentInput,
   currentDrug: string | null,
   formularyDrug: FormularyDrug | null,
-  quadrant: string
+  quadrant: string,
+  currentDoseReduction: 0 | 25 | 50,
+  lowestTierInFormulary: number,
+  currentTier: number,
+  availableTiers: number[]
 ): Promise<TriageResult> {
-  const prompt = `You are a clinical decision support AI for dermatology biologic optimization.
+  const prompt = `You are a clinical decision support AI for dermatology biologic optimization with comprehensive tier and dose reduction logic.
 
 Patient Information:
 - Diagnosis: ${assessment.diagnosis}
 - Current medication: ${currentDrug || 'None (not on biologic)'}
+- Current dose status: ${currentDoseReduction === 0 ? 'Standard dosing' : `${currentDoseReduction}% dose-reduced`}
 - DLQI Score: ${assessment.dlqiScore} (0-30 scale, lower is better)
 - Months stable: ${assessment.monthsStable}
 - Has psoriatic arthritis: ${assessment.hasPsoriaticArthritis ? 'Yes' : 'No'}
 - Additional notes: ${assessment.additionalNotes || 'None'}
 
-Formulary Status:
-- Tier: ${formularyDrug?.tier || 'Unknown'}
+Formulary Tier Structure (RELATIVE TIER LOGIC):
+- Available tiers in formulary: [${availableTiers.join(', ')}]
+- Lowest tier in formulary: Tier ${lowestTierInFormulary}
+- Current tier: Tier ${currentTier}
 - Requires PA: ${formularyDrug?.requiresPA || 'Unknown'}
 - Classification: ${quadrant.replace(/_/g, ' ').toUpperCase()}
 
-The patient has been classified as: ${quadrant}
-- not_on_biologic: Patient needs biologic initiation → Recommend best Tier 1 option
-- stable_short_duration: Patient is stable (DLQI ≤4) but for <6 months → Continue current therapy, re-evaluate after sufficient time
-- stable_optimal: Stable + Tier 1 → Consider dose reduction OR within-tier optimization
-- stable_suboptimal: Stable + Tier 2-5 → MUST recommend switch to Tier 1
-- unstable_optimal: Unstable + Tier 1 → Consider different Tier 1 option or optimize current
-- unstable_suboptimal: Unstable + Tier 2-5 → ⚠️ MUST recommend switch to Tier 1 (NEVER just continue or optimize current)
+KEY PRINCIPLE: Cost savings is the priority. The lowest available tier in THIS formulary is the target, not necessarily Tier 1.
 
-CRITICAL: Tier 2, 3, 4, and 5 indicate room for optimization. These patients should ALWAYS get switch recommendations to Tier 1.
-NOTE: Tier 5 typically means "Not Covered" - these patients need immediate switching.
+COMPREHENSIVE TIER CASCADE LOGIC:
+- For stable patients ABOVE lowest tier: Recommend switches to ALL lower tiers (lowest first), then dose reduction when reaching current tier
+- For stable patients ON lowest tier: Recommend dose reduction stepping (0% → 25% → 50% max)
+- For unstable + dose-reduced patients: Return to standard dosing FIRST
+- For stable <6 months: CAN switch tiers, CANNOT dose reduce yet
 
-Based on the quadrant "${quadrant}", determine:
-1. Should dose reduction be considered? (Only for stable_optimal AND currently Tier 1, NOT for stable_short_duration)
-2. Should formulary switch be recommended? (YES for any "suboptimal" OR "not_on_biologic", NOT for stable_short_duration)
-3. Should recommend biologic initiation? (YES for "not_on_biologic")
-4. Should continue current therapy? (YES for stable_short_duration)
-5. Provide clinical reasoning
+DOSE REDUCTION STEPPING:
+- Maximum reduction: 50% from standard
+- Step 1: Standard (0%) → 25% reduction
+- Step 2: 25% → 50% reduction (maximum)
+- Only for stable ≥6 months
+- Clinical evidence should be retrieved
+
+CONTINUE CURRENT only when:
+- Stable <6 months (too early to optimize), OR
+- Already dose-reduced + on lowest tier + stable
+
+Based on quadrant "${quadrant}", current dose ${currentDoseReduction}%, tier ${currentTier} of ${lowestTierInFormulary}, determine:
+1. Should dose reduction be considered?
+2. Should formulary switch be recommended?
+3. What is the recommendation priority order?
+4. Provide clinical reasoning
 
 Return ONLY a JSON object with this exact structure:
 {
@@ -288,49 +395,245 @@ function filterByDiagnosis(
   });
 }
 
+interface ContraindicatedDrug {
+  drug: FormularyDrug;
+  reasons: Array<{
+    type: string;
+    severity: 'ABSOLUTE' | 'RELATIVE';
+    reason: string;
+    details?: string;
+  }>;
+}
+
 /**
- * Filter out contraindicated drugs based on patient contraindications
+ * Comprehensive contraindication checking
+ * Returns both safe and contraindicated drugs with reasons and severity
+ */
+function checkDrugContraindications(
+  drugs: FormularyDrug[],
+  contraindications: Contraindication[]
+): { safe: FormularyDrug[]; contraindicated: ContraindicatedDrug[] } {
+  if (contraindications.length === 0) {
+    return { safe: drugs, contraindicated: [] };
+  }
+
+  const safe: FormularyDrug[] = [];
+  const contraindicated: ContraindicatedDrug[] = [];
+
+  for (const drug of drugs) {
+    const normalizedDrugClass = drug.drugClass?.toUpperCase().replace(/\s+/g, '_') || '';
+    const reasons: ContraindicatedDrug['reasons'] = [];
+
+    // Check each contraindication against drug class
+    for (const ci of contraindications) {
+      const ciType = ci.type;
+
+      // TNF INHIBITORS
+      if (normalizedDrugClass.includes('TNF')) {
+        if (ciType === 'HEART_FAILURE') {
+          reasons.push({
+            type: ciType,
+            severity: 'ABSOLUTE',
+            reason: 'TNF inhibitors can worsen heart failure and increase mortality',
+            details: ci.details
+          });
+        }
+        if (ciType === 'MULTIPLE_SCLEROSIS' || ciType === 'DEMYELINATING_DISEASE') {
+          reasons.push({
+            type: ciType,
+            severity: 'ABSOLUTE',
+            reason: 'TNF inhibitors can exacerbate demyelinating diseases',
+            details: ci.details
+          });
+        }
+        if (ciType === 'LYMPHOMA') {
+          reasons.push({
+            type: ciType,
+            severity: 'RELATIVE',
+            reason: 'History of lymphoma - TNF inhibitors may increase recurrence risk. Consider risk/benefit with oncology.',
+            details: ci.details
+          });
+        }
+        if (ciType === 'MALIGNANCY') {
+          reasons.push({
+            type: ciType,
+            severity: 'RELATIVE',
+            reason: 'Active or recent malignancy - TNF inhibitors may affect tumor surveillance. Discuss with oncology.',
+            details: ci.details
+          });
+        }
+        if (ciType === 'HEPATITIS_B') {
+          reasons.push({
+            type: ciType,
+            severity: 'RELATIVE',
+            reason: 'Hepatitis B can reactivate with TNF inhibitors. Requires antiviral prophylaxis and monitoring.',
+            details: ci.details
+          });
+        }
+        if (ciType === 'LATENT_TUBERCULOSIS') {
+          reasons.push({
+            type: ciType,
+            severity: 'RELATIVE',
+            reason: 'Latent TB requires prophylactic treatment before starting TNF inhibitor.',
+            details: ci.details
+          });
+        }
+        if (ciType === 'ACTIVE_TUBERCULOSIS') {
+          reasons.push({
+            type: ciType,
+            severity: 'ABSOLUTE',
+            reason: 'Active TB must be treated before starting any biologic, especially TNF inhibitors.',
+            details: ci.details
+          });
+        }
+      }
+
+      // JAK INHIBITORS
+      if (normalizedDrugClass.includes('JAK') || normalizedDrugClass.includes('TYK2')) {
+        if (ciType === 'THROMBOSIS' || ciType === 'VENOUS_THROMBOEMBOLISM') {
+          reasons.push({
+            type: ciType,
+            severity: 'ABSOLUTE',
+            reason: 'JAK inhibitors significantly increase VTE risk. Contraindicated in patients with thrombosis history.',
+            details: ci.details
+          });
+        }
+        if (ciType === 'CARDIOVASCULAR_DISEASE') {
+          reasons.push({
+            type: ciType,
+            severity: 'RELATIVE',
+            reason: 'JAK inhibitors increase MACE risk. Consider in patients >50 with CV risk factors. Monitor closely.',
+            details: ci.details
+          });
+        }
+        if (ciType === 'MALIGNANCY') {
+          reasons.push({
+            type: ciType,
+            severity: 'RELATIVE',
+            reason: 'JAK inhibitors may increase cancer risk. Discuss risk/benefit in patients with cancer history.',
+            details: ci.details
+          });
+        }
+        if (ciType === 'CYTOPENIAS') {
+          reasons.push({
+            type: ciType,
+            severity: 'RELATIVE',
+            reason: 'JAK inhibitors can worsen cytopenias. Requires baseline labs and monitoring.',
+            details: ci.details
+          });
+        }
+      }
+
+      // IL-17 INHIBITORS
+      if (normalizedDrugClass.includes('IL17') || normalizedDrugClass.includes('IL-17')) {
+        if (ciType === 'INFLAMMATORY_BOWEL_DISEASE') {
+          reasons.push({
+            type: ciType,
+            severity: 'RELATIVE',
+            reason: 'IL-17 inhibitors can worsen or trigger IBD. Use with caution and GI consultation.',
+            details: ci.details
+          });
+        }
+        if (ciType === 'DIVERTICULITIS') {
+          reasons.push({
+            type: ciType,
+            severity: 'RELATIVE',
+            reason: 'IL-17 inhibitors may increase intestinal perforation risk. Monitor for GI symptoms.',
+            details: ci.details
+          });
+        }
+      }
+
+      // ALL BIOLOGICS
+      if (ciType === 'ACTIVE_INFECTION') {
+        reasons.push({
+          type: ciType,
+          severity: 'ABSOLUTE',
+          reason: 'Active infection must be treated before starting any biologic therapy.',
+          details: ci.details
+        });
+      }
+      if (ciType === 'OPPORTUNISTIC_INFECTION') {
+        reasons.push({
+          type: ciType,
+          severity: 'ABSOLUTE',
+          reason: 'History of opportunistic infection requires ID consultation before biologics.',
+          details: ci.details
+        });
+      }
+      if (ciType === 'MALIGNANCY' && !reasons.some(r => r.type === 'MALIGNANCY')) {
+        reasons.push({
+          type: ciType,
+          severity: 'RELATIVE',
+          reason: 'Active or recent malignancy - biologics may affect tumor surveillance. Requires oncology clearance.',
+          details: ci.details
+        });
+      }
+      if (ciType === 'IMMUNOCOMPROMISED' && !reasons.some(r => r.type === 'IMMUNOCOMPROMISED')) {
+        reasons.push({
+          type: ciType,
+          severity: 'RELATIVE',
+          reason: 'Immunocompromised state increases infection risk with biologics. Monitor closely.',
+          details: ci.details
+        });
+      }
+      if (ciType === 'PREGNANCY') {
+        reasons.push({
+          type: ciType,
+          severity: 'RELATIVE',
+          reason: 'Pregnancy requires careful risk/benefit assessment. Some biologics are safer than others. Consult maternal-fetal medicine.',
+          details: ci.details
+        });
+      }
+      if (ciType === 'LIVE_VACCINE_RECENT') {
+        reasons.push({
+          type: ciType,
+          severity: 'RELATIVE',
+          reason: 'Wait 4+ weeks after live vaccine before starting biologics. No live vaccines while on therapy.',
+          details: ci.details
+        });
+      }
+      if (ciType === 'SURGERY_PLANNED') {
+        reasons.push({
+          type: ciType,
+          severity: 'RELATIVE',
+          reason: 'Hold biologics peri-operatively to reduce infection risk. Timing depends on drug half-life.',
+          details: ci.details
+        });
+      }
+    }
+
+    // Categorize drug as safe or contraindicated
+    // Exclude if ANY absolute contraindication, or if ONLY showing safe drugs
+    const hasAbsoluteContraindication = reasons.some(r => r.severity === 'ABSOLUTE');
+
+    if (reasons.length === 0) {
+      safe.push(drug);
+    } else if (hasAbsoluteContraindication) {
+      // Absolute contraindications - exclude from main recommendations
+      contraindicated.push({ drug, reasons });
+      console.log(`  ⚠️  ABSOLUTE contraindication: ${drug.drugName} - ${reasons.filter(r => r.severity === 'ABSOLUTE').map(r => r.type).join(', ')}`);
+    } else {
+      // Only relative contraindications - still flag but could be considered with caution
+      contraindicated.push({ drug, reasons });
+      console.log(`  ⚠️  RELATIVE contraindication: ${drug.drugName} - ${reasons.map(r => r.type).join(', ')}`);
+    }
+  }
+
+  console.log(`Contraindication filtering: ${drugs.length} total → ${safe.length} safe, ${contraindicated.length} contraindicated (${contraindicated.filter(c => c.reasons.some(r => r.severity === 'ABSOLUTE')).length} absolute, ${contraindicated.filter(c => c.reasons.every(r => r.severity === 'RELATIVE')).length} relative)`);
+
+  return { safe, contraindicated };
+}
+
+/**
+ * Legacy function for backward compatibility - filters out all contraindicated drugs
+ * Use checkDrugContraindications() for full tracking
  */
 function filterContraindicated(
   drugs: FormularyDrug[],
   contraindications: Contraindication[]
 ): FormularyDrug[] {
-  if (contraindications.length === 0) return drugs;
-
-  const contraindicationTypes = contraindications.map(c => c.type);
-
-  return drugs.filter(drug => {
-    // Normalize drug class for comparison (handle both "TNF Inhibitor" and "TNF_INHIBITOR")
-    const normalizedDrugClass = drug.drugClass?.toUpperCase().replace(/\s+/g, '_') || '';
-
-    // TNF inhibitors contraindicated in CHF and MS
-    if (normalizedDrugClass.includes('TNF')) {
-      if (contraindicationTypes.includes('HEART_FAILURE')) {
-        console.log(`  ⚠️  Excluding ${drug.drugName} (TNF inhibitor) due to HEART_FAILURE contraindication`);
-        return false;
-      }
-      if (contraindicationTypes.includes('MULTIPLE_SCLEROSIS')) {
-        console.log(`  ⚠️  Excluding ${drug.drugName} (TNF inhibitor) due to MULTIPLE_SCLEROSIS contraindication`);
-        return false;
-      }
-    }
-
-    // IL-17 inhibitors can worsen IBD
-    if (normalizedDrugClass.includes('IL17') || normalizedDrugClass.includes('IL-17')) {
-      if (contraindicationTypes.includes('INFLAMMATORY_BOWEL_DISEASE')) {
-        console.log(`  ⚠️  Excluding ${drug.drugName} (IL-17 inhibitor) due to IBD contraindication`);
-        return false;
-      }
-    }
-
-    // All biologics contraindicated in active infection
-    if (contraindicationTypes.includes('ACTIVE_INFECTION')) {
-      console.log(`  ⚠️  Excluding ${drug.drugName} due to ACTIVE_INFECTION contraindication`);
-      return false;
-    }
-
-    return true;
-  });
+  return checkDrugContraindications(drugs, contraindications).safe;
 }
 
 /**
@@ -344,7 +647,11 @@ async function getLLMRecommendationSuggestions(
   evidence: string[],
   formularyOptions: FormularyDrug[],
   currentFormularyDrug: FormularyDrug | null,
-  contraindications: Contraindication[]
+  contraindications: Contraindication[],
+  currentDoseReduction: 0 | 25 | 50,
+  lowestTierInFormulary: number,
+  currentTier: number,
+  availableTiers: number[]
 ): Promise<LLMRecommendation[]> {
   const contraindicationText = contraindications.length > 0
     ? contraindications.map(c => c.type).join(', ')
@@ -355,7 +662,7 @@ async function getLLMRecommendationSuggestions(
 
   // Build current dosing information string
   const currentDosingInfo = currentBiologic
-    ? `${currentBiologic.dose} ${currentBiologic.frequency}`
+    ? `${currentBiologic.dose} ${currentBiologic.frequency} (${currentDoseReduction === 0 ? 'Standard' : `${currentDoseReduction}% reduced`})`
     : 'Not specified';
 
   // Filter and deduplicate formulary options
@@ -397,234 +704,181 @@ async function getLLMRecommendationSuggestions(
 
   const prompt = `You are a clinical decision support AI for dermatology biologic optimization.
 
-Patient Information:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PATIENT INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Current medication: ${currentBrandName || 'None (not on biologic)'}${currentDrug && currentDrug !== currentBrandName ? ` (generic: ${currentDrug})` : ''}
 - Current dosing: ${currentDosingInfo}
 - Diagnosis: ${assessment.diagnosis}
 - DLQI Score: ${assessment.dlqiScore}
 - Months stable: ${assessment.monthsStable}
+- Psoriatic arthritis: ${assessment.hasPsoriaticArthritis ? 'YES - prefer drugs with PsA indication' : 'NO'}
+- Additional notes: ${assessment.additionalNotes || 'None'}
 - Quadrant: ${triage.quadrant}
 - Triage reasoning: ${triage.reasoning}
 - Contraindications: ${contraindicationText}
 
-Current Formulary Status:
-${currentFormularyDrug ? `Tier ${currentFormularyDrug.tier}, PA: ${currentFormularyDrug.requiresPA || 'Unknown'}, Annual Cost: $${currentFormularyDrug.annualCostWAC}` : 'Not on formulary'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FORMULARY TIER STRUCTURE (RELATIVE LOGIC)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Available tiers in formulary (for indicated drugs): [${availableTiers.join(', ')}]
+- Lowest tier in this formulary: ${lowestTierInFormulary}
+- Patient's current tier: ${currentTier}
+- Current dose reduction status: ${currentDoseReduction}%
+- Current formulary status: ${currentFormularyDrug ? `Tier ${currentFormularyDrug.tier}, PA: ${currentFormularyDrug.requiresPA || 'Unknown'}, Annual Cost: $${currentFormularyDrug.annualCostWAC}` : 'Not on formulary'}
 
-Available Formulary Options (${tier1Count} unique Tier 1 drugs available):
+Available Formulary Options (deduplicated by generic name):
 ${formularyText}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CLINICAL EVIDENCE FROM KNOWLEDGE BASE (Use these papers for dose reduction citations):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ CRITICAL: Cost savings is THE priority. Always recommend the LOWEST tier available in this formulary first (Tier ${lowestTierInFormulary}), not necessarily Tier 1.
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CLINICAL EVIDENCE FROM KNOWLEDGE BASE (Use for dose reduction citations)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${evidenceText}
 
-⚠️ CRITICAL: When recommending DOSE_REDUCTION, cite ALL relevant papers from the evidence above by their specific titles and authors. If multiple papers are available, cite all relevant ones. If only 1-2 papers are relevant, cite those accurately. NEVER hallucinate or invent citations. Extract paper titles/authors (e.g., "CONDOR trial (Atalay et al.)", "Piaserico et al.", "Hansel et al.") and build a truthful, evidence-based rationale. Accuracy > citation count.
+⚠️ When recommending DOSE_REDUCTION, cite ALL relevant papers from above by specific titles and authors. NEVER hallucinate citations. Accuracy > citation count.
 
-CONTRAINDICATION RULES (CRITICAL - NEVER recommend contraindicated drugs):
-- TNF inhibitors (adalimumab, infliximab, etanercept): CONTRAINDICATED if HEART_FAILURE or MULTIPLE_SCLEROSIS
-- IL-17 inhibitors (secukinumab, ixekizumab, brodalumab): Can worsen INFLAMMATORY_BOWEL_DISEASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TIER CASCADE ALGORITHM (COST SAVINGS PRIORITY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**PRIMARY PRINCIPLE: Recommend LOWEST tier first, cascade upward to current tier, THEN dose reduction**
+
+For STABLE patients (DLQI ≤4) above the lowest tier:
+1. **First Priority**: Recommend switches to Tier ${lowestTierInFormulary} (lowest available)
+2. **Second Priority**: Recommend switches to next lowest tier (${availableTiers[1] || 'N/A'})
+3. **Third Priority**: Continue cascade through available tiers up to patient's current tier
+4. **Fourth Priority**: ONLY when reaching current tier (${currentTier}), offer dose reduction
+5. **Last Resort**: CONTINUE_CURRENT only if already dose-reduced + on lowest tier + stable
+
+For STABLE patients ON the lowest tier (Tier ${lowestTierInFormulary}):
+1. **First Priority**: Dose reduction with 25% stepping (if current dose = 0% reduced → recommend 25% reduction)
+2. **Second Priority**: Further dose reduction (if current dose = 25% reduced → recommend 50% reduction)
+3. **Third Priority**: CONTINUE_CURRENT (if already 50% reduced, maximum optimization reached)
+4. **Maximum**: 50% reduction from standard dosing (NEVER exceed 50%)
+
+For UNSTABLE patients (DLQI >4):
+1. **Never dose reduce** - patient needs better control
+2. Recommend most efficacious drugs in best available tier
+3. Prioritize mechanism switching (TNF → IL-17/IL-23 for better efficacy)
+
+For patients stable <6 months:
+1. **CONTINUE_CURRENT** - too early to optimize (need ${6 - assessment.monthsStable} more months)
+2. Mention future options once 6 months stability achieved
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DOSE REDUCTION STEPPING RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Patient's current dose reduction: ${currentDoseReduction}%
+
+**Stepping Logic:**
+- Standard (0%) → First reduction: 25% extension (e.g., Q2W → Q3W, Q4W → Q6W, Q8W → Q10W, Q12W → Q16W)
+- 25% reduced → Second reduction: 50% extension (e.g., Q2W → Q4W, Q4W → Q8W, Q8W → Q12W, Q12W → Q18W)
+- 50% reduced → Maximum reached, CONTINUE_CURRENT only
+- NEVER exceed 50% reduction from FDA standard maintenance dosing
+
+**Examples of Proper Stepping:**
+- Adalimumab (Q2W standard): 0% → Q3W (25%) → Q4W (50%) [STOP]
+- Secukinumab (Q4W standard): 0% → Q6W (25%) → Q8W (50%) [STOP]
+- Risankizumab (Q8W standard): 0% → Q10W (25%) → Q12W (50%) [STOP]
+- Ustekinumab (Q12W standard): 0% → Q16W (25%) → Q18W (50%) [STOP]
+
+⚠️ CRITICAL: A reduction MUST extend the interval beyond current. NEVER recommend same interval.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WITHIN-TIER EFFICACY RANKING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When multiple drugs exist in same tier, rank by clinical efficacy:
+
+**Psoriasis Efficacy Hierarchy:**
+1. IL-23 inhibitors (Risankizumab, Guselkumab, Tildrakizumab) - highest efficacy
+2. IL-17 inhibitors (Secukinumab, Ixekizumab, Brodalumab) - excellent efficacy
+3. TNF inhibitors (Adalimumab, Infliximab, Etanercept) - good efficacy
+4. IL-4/13 inhibitors (Dupilumab) - moderate efficacy, excellent for AD
+5. Oral agents (Apremilast, Deucravacitinib) - moderate efficacy
+
+**Comorbidity Considerations (parse additionalNotes):**
+- Asthma + Atopic Dermatitis → Dupilumab strongly preferred (multi-indication benefit)
+- Psoriatic arthritis → IL-17 or TNF inhibitors preferred over IL-23
+- Inflammatory bowel disease → AVOID IL-17 inhibitors, prefer TNF or IL-23
+- Cardiovascular disease → Consider IL-23 (no heart failure concerns vs TNF)
+
+⚠️ Parse the "Additional notes" field above for comorbidities and adjust ranking accordingly.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONTRAINDICATION RULES (PRE-FILTERED)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- TNF inhibitors: CONTRAINDICATED if HEART_FAILURE or MULTIPLE_SCLEROSIS
+- IL-17 inhibitors: Can worsen INFLAMMATORY_BOWEL_DISEASE
 - ALL biologics: CONTRAINDICATED if ACTIVE_INFECTION
 - Contraindicated drugs have been PRE-FILTERED from formulary options shown above
 
-DOSE REDUCTION RULES (CRITICAL - Must be TRUE reduction):
-⚠️ A dose reduction MUST extend the dosing interval beyond the current regimen:
-- Current: Every 2 weeks → Reduction: Every 3-4 weeks ✓
-- Current: Every 4 weeks (Monthly) → Reduction: Every 6-8 weeks ✓
-- Current: Every 8 weeks → Reduction: Every 12 weeks ✓
-- Current: Every 12 weeks → Reduction: Every 16 weeks ✓
-- NEVER recommend the same interval as current (e.g., "Monthly" → "Every 4 weeks" is NOT a reduction!)
-- Look at "Current dosing" above to see the exact current interval
-- Examples of PROPER dose reductions by drug:
-  * Adalimumab: 40mg every 2 weeks → 40mg every 3-4 weeks
-  * Secukinumab: 300mg monthly → 300mg every 6-8 weeks
-  * Ustekinumab: 45mg/90mg every 12 weeks → every 16 weeks
-  * Guselkumab/Risankizumab: Every 8 weeks → every 12 weeks
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RECOMMENDATION TYPES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-CRITICAL TIER OPTIMIZATION RULES:
-⚠️ **Tier 2, 3, 4, or 5 should ALMOST NEVER result in CONTINUE or just OPTIMIZE_CURRENT**
-   - There is ALWAYS room to optimize by moving to Tier 1
-   - Generate SWITCH recommendations to Tier 1 drugs
-   - Tier 5 = "Not Covered" requires URGENT switching
-   - Only use CONTINUE if you absolutely cannot generate 3 switch options
+Use these types:
+- **SWITCH_TO_BIOSIMILAR**: Switching to biosimilar version of current drug (e.g., Humira → Amjevita)
+- **SWITCH_TO_PREFERRED**: Switching to different drug in lower tier (formulary optimization)
+- **THERAPEUTIC_SWITCH**: Switching mechanism for efficacy (e.g., TNF → IL-23 for better control)
+- **DOSE_REDUCTION**: Extending interval of current drug (must cite RAG evidence)
+- **CONTINUE_CURRENT**: Continue current therapy unchanged (only when truly no optimization possible)
+- **OPTIMIZE_CURRENT**: Minor adjustments to current therapy
 
-⚠️ **CONTINUE should ONLY be used when:**
-   - Already on Tier 1 AND stable AND dose-reduced/optimized (truly no more optimization possible)
-   - OR you cannot generate 3 other recommendations despite trying
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EVIDENCE REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-TIER HIERARCHY (1-5 scale):
-   - Tier 1: Preferred, lowest cost-share
-   - Tier 2: Non-preferred, higher cost-share
-   - Tier 3: Higher tier, much higher cost-share
-   - Tier 4: Very high tier, very high cost-share
-   - Tier 5: Not covered (patient pays full cost)
+**DOSE_REDUCTION ONLY** - Must cite RAG evidence:
+- Cite ALL relevant papers from Clinical Evidence section above
+- Reference by actual titles/authors (e.g., "CONDOR trial (Atalay et al.)")
+- Include specific findings from studies
+- If 5 papers relevant, cite all 5. If only 2 relevant, cite those 2 accurately
+- NEVER hallucinate citations. Accuracy > citation count.
+- Example: "Multiple studies support adalimumab dose reduction in stable psoriasis. The CONDOR trial (Atalay et al.) demonstrated that extending dosing intervals to every 4 weeks was noninferior to usual care based on DLQI. Additional studies by Piaserico et al. showed successful down-titration with maintenance of clearance."
 
-Goal: Move patients from higher tiers (2-5) to Tier 1 when clinically appropriate
+**FORMULARY SWITCHES** - NO RAG needed:
+- Cost optimization is self-evident business case
+- Provide clear clinical reasoning but no citations needed
 
-CLINICAL DECISION-MAKING GUIDELINES:
-1. **not_on_biologic**: Recommend BEST Tier 1 option based on:
-   - Highest efficacy for ${assessment.diagnosis} (cite RAG evidence)
-   - Psoriatic arthritis coverage if needed: ${assessment.hasPsoriaticArthritis ? 'YES - prefer drugs with PsA indication' : 'NO'}
-   - Lowest cost within Tier 1
-   - Generate 2-3 Tier 1 options if available
+**THERAPEUTIC SWITCHES** - NO RAG needed:
+- Standard clinical practice for efficacy escalation
+- Provide rationale but no citations needed
 
-2. **stable_short_duration** (DLQI ≤4 but <6 months stable):
-   - PRIMARY: CONTINUE_CURRENT - patient has good control but insufficient duration
-   - Calculate months needed to reach 6 months total: ${6 - assessment.monthsStable} more months
-   - OPTION 2 & 3: Mention future options to consider once 6 months stability is achieved (formulary switches or dose reduction as appropriate)
-   - Rationale: Premature optimization risks disrupting newly achieved stability
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OUTPUT REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-3. **stable_optimal** (Tier 1, stable ≥6 months):
-   - PRIMARY: Dose reduction (cite RAG evidence for safety/efficacy of extended intervals)
-   - ALTERNATIVE OPTIONS (if needed to reach 3 total recommendations):
-     * CONTINUE_CURRENT at standard dose (if patient declines dose reduction)
-     * Switch to DIFFERENT Tier 1 drug ONLY if it's a biosimilar with significantly lower cost
-   - ⚠️ NEVER recommend "switching" to the current drug - that's a continuation, not a switch
-   - The current drug has been EXCLUDED from the formulary options list below
+Generate EXACTLY 3 specific recommendations ranked by cost savings and clinical benefit.
 
-4. **stable_suboptimal** - TIER-SPECIFIC STRATEGY (Tiers 2-5):
-
-   ALWAYS generate exactly 3 unique recommendations. NEVER recommend the same drug twice.
-   ⚠️ DO NOT output placeholder text like "No Tier 1 options available" as a drug name.
-
-   a. **Primary: Switch to Tier 1** (If Tier 1 count > 0):
-      - Recommend ALL unique Tier 1 drugs available (check the count above)
-      - Each Tier 1 drug should only be recommended ONCE
-      - Prioritize biosimilars of current drug if available
-      - Then same-class drugs (e.g., if on TNF inhibitor, recommend other TNF inhibitors in Tier 1)
-      - Then cross-class if better efficacy
-      - No RAG needed for switch rationale (formulary alignment is self-evident)
-
-   b. **Secondary: Dose Reduction** (If Tier 1 count < 3 AND patient stable):
-      - ONLY for Tier 2 or Tier 3 patients (NOT Tier 4-5)
-      - Reduce dose/extend interval of current drug (cite RAG evidence)
-      - Example: If only 2 unique Tier 1 drugs → Rec 1: Switch to Tier 1 drug A, Rec 2: Switch to Tier 1 drug B, Rec 3: Dose reduce current drug
-
-   c. **If NO Tier 1 options available** (e.g., all contraindicated or already being used):
-      Strategy depends on patient stability AND whether better alternatives exist in same/next tiers:
-
-      **For STABLE patients (DLQI ≤4):**
-      - PRIMARY: Dose reduction (patient stable, reduce exposure/cost)
-      - SECONDARY: If more efficacious alternatives exist in same/next tier, recommend those
-      - Prioritize drugs with SUPERIOR EFFICACY over lateral tier moves
-      - Example 1: Tier 2 IL-17, TNF contraindicated, stable, superior IL-23 available →
-        * Rec 1: Dose reduce current IL-17 (monthly → every 6-8 weeks)
-        * Rec 2: Switch to IL-23 inhibitor (Tier 3, superior efficacy)
-        * Rec 3: Switch to oral PDE4 (Tier 3, alternative)
-      - Example 2: Tier 2, stable, no better alternatives in Tier 2/3 →
-        * Rec 1: Dose reduce current (primary strategy when no upgrades available)
-        * Rec 2: Dose reduce with different interval
-        * Rec 3: CONTINUE_CURRENT at standard dose (option if patient declines reduction)
-
-      **For UNSTABLE patients (DLQI >4):**
-      - NEVER dose reduce (patient needs better control, not less medication)
-      - Recommend MOST EFFICACIOUS drugs in same or next available tier
-      - Prioritize mechanism switching for clinical benefit (e.g., IL-17 → IL-23)
-      - Within same tier: Recommend drugs with proven superior efficacy
-      - Example: Tier 2 IL-17, TNF contraindicated, unstable, IL-23 more efficacious →
-        * Rec 1: Switch to IL-23 inhibitor (Tier 3, best efficacy for ${assessment.diagnosis})
-        * Rec 2: Switch to different IL-23 or oral option (Tier 2/3)
-        * Rec 3: Switch to alternative mechanism (e.g., PDE4, TYK2)
-
-      **Efficacy Prioritization:**
-      - IL-23 inhibitors (Risankizumab, Guselkumab) typically have superior efficacy for psoriasis
-      - IL-17 inhibitors (Secukinumab, Ixekizumab) good second-line
-      - TNF inhibitors effective but often lower efficacy than IL-23/IL-17
-      - Oral agents (Apremilast, Deucravacitinib) for moderate disease or biologic-averse patients
-
-   d. **Tertiary: Next Best Tier** (If still <3 recommendations):
-      - Recommend next best available tier drugs with different mechanisms
-      - Only if absolutely necessary to reach 3 total recommendations
-
-   e. **Tier-Specific Notes**:
-      - Tier 2: Prefer switch to Tier 1 if available, otherwise same-tier switches
-      - Tier 3: Prefer switch to Tier 1, then Tier 2, only if needed dose reduction
-      - Tier 4-5: NEVER dose reduce, ONLY switch to lower tiers (urgently to Tier 1 or Tier 2/3)
-
-5. **unstable_optimal** (Tier 1, unstable):
-   - Switch to different Tier 1 with superior efficacy (cite evidence)
-   - Prefer different mechanism of action (e.g., if TNF failed, try IL-17 or IL-23)
-   - Target drugs with proven higher efficacy for ${assessment.diagnosis}
-
-6. **unstable_suboptimal** (Tier 2-5, unstable):
-
-   ⚠️ CRITICAL: NEVER recommend dose reduction for unstable patients (DLQI >4)
-
-   Strategy: Recommend MOST EFFICACIOUS drugs in best available tier
-
-   a. **If Tier 1 options available**:
-      - Switch to Tier 1 drugs with BEST EFFICACY for ${assessment.diagnosis}
-      - Prefer different mechanism if current class failing (e.g., TNF → IL-17/IL-23)
-      - Generate 3 Tier 1 switch recommendations ranked by efficacy
-      - Within Tier 1: IL-17 biosimilars > TNF biosimilars for psoriasis
-
-   b. **If NO Tier 1 options available** (e.g., all contraindicated):
-      - DO NOT output placeholder text like "No Tier 1 options available"
-      - Recommend MOST EFFICACIOUS drugs from Tier 2/3 (prioritize efficacy over tier)
-      - Efficacy hierarchy for psoriasis: IL-23 > IL-17 > TNF > Oral agents
-      - Example: Patient on Tier 2 IL-17 (Cosentyx), TNF contraindicated, unstable →
-        * Rec 1: Skyrizi (IL-23, Tier 3) - HIGHEST efficacy for psoriasis
-        * Rec 2: Tremfya (IL-23, Tier 5 if available) - HIGHEST efficacy even if higher tier
-        * Rec 3: Otezla (PDE4, Tier 3) - Oral alternative
-      - Focus on CLINICAL BENEFIT (efficacy) not just tier optimization
-      - Mechanism switching for therapeutic escalation
-
-   c. **For Tier 4-5 (unstable)**:
-      - URGENT switch to lower tiers OR more efficacious drugs
-      - Tier 4 Humira (TNF) → Switch to Tier 2/3 IL-23 (better efficacy + lower cost)
-      - Patient needs better control AND lower cost
-      - NEVER dose reduce unstable patients regardless of tier
-
-   **Key Principle**: For UNSTABLE patients, EFFICACY is paramount. Recommend the most
-   effective drugs available, even if they're in a higher tier than current, as long as
-   they're in the formulary and not contraindicated.
-
-PRIORITIZATION:
-- Always prefer Tier 1 > Tier 2 > Tier 3 > Tier 4 > Tier 5
-- Within same tier: Prefer drugs without Prior Auth requirement over those with PA (for NEW switches only)
-- Note: PA requirement does NOT affect classification of current therapy (patient already cleared that hurdle)
-- Within same tier: Higher efficacy > Lower cost > Simpler dosing
-- For ${assessment.diagnosis}, consider drug class preferences from guidelines
-
-EVIDENCE REQUIREMENTS (RAG):
-- **DOSE REDUCTION ONLY**:
-  * Cite ALL relevant papers from the Clinical Evidence section above - however many that is
-  * If 5 papers are relevant, cite all 5. If only 2 papers are relevant, cite those 2 accurately
-  * NEVER hallucinate or invent citations to reach a target number
-  * Reference papers by their actual titles and authors from the evidence above (e.g., "The CONDOR trial (Atalay et al.)", "Piaserico et al.")
-  * Include specific findings from the studies to build evidence-based rationale
-  * The rationale should transparently present what the literature actually shows
-  * Accuracy and truthfulness > citation count
-  * DO NOT use generic phrases like "Based on RAG evidence" - cite actual study names and authors when available
-- **FORMULARY SWITCHES**: NO RAG - cost optimization is self-evident business case
-- **THERAPEUTIC SWITCHES** (unstable escalation): NO RAG - standard clinical practice, provide rationale but no citations needed
-
-Generate AT LEAST 3 specific recommendations ranked by clinical benefit and cost savings. For EACH recommendation:
-1. Type (DOSE_REDUCTION, SWITCH_TO_BIOSIMILAR, SWITCH_TO_PREFERRED, THERAPEUTIC_SWITCH, OPTIMIZE_CURRENT, or CONTINUE_CURRENT)
-2. Specific drug name:
-   - For CONTINUE_CURRENT or OPTIMIZE_CURRENT: MUST be "${currentBrandName}" (the patient's current medication)
-   - For DOSE_REDUCTION: MUST be "${currentBrandName}" (reducing dose of current medication)
-   - For SWITCH recommendations: MUST be from formulary options listed above
-3. New dose:
-   - DOSE_REDUCTION: Extract SPECIFIC reduced dose from RAG evidence (e.g., "40 mg")
-   - SWITCHES: Provide FDA-approved SPECIFIC dose (e.g., "80 mg initial, then 40 mg" or "300 mg")
-   - NEVER use generic phrases like "Per label" - always specify the actual dose
-4. New frequency:
-   - DOSE_REDUCTION: Extract SPECIFIC reduced interval from RAG evidence (e.g., "every 4 weeks" instead of "every 2 weeks")
-   - SWITCHES: Provide FDA-approved SPECIFIC frequency (e.g., "every 2 weeks starting 1 week after initial dose")
-   - NEVER use generic phrases like "Per label" - always specify the actual interval
-5. Detailed rationale:
+For EACH recommendation provide:
+1. **Type**: One of the types listed above
+2. **Drug name**:
+   - CONTINUE_CURRENT/OPTIMIZE_CURRENT/DOSE_REDUCTION: "${currentBrandName}"
+   - SWITCH recommendations: From formulary options above
+   - NEVER recommend same drug twice
+3. **New dose**:
+   - DOSE_REDUCTION: Specific reduced dose (e.g., "40 mg")
+   - SWITCHES: FDA-approved specific dose (e.g., "300 mg", "80 mg initial then 40 mg")
+   - NEVER use "Per label" - always specify actual dose
+4. **New frequency**:
+   - DOSE_REDUCTION: Specific reduced interval (e.g., "every 4 weeks")
+   - SWITCHES: FDA-approved specific frequency (e.g., "every 2 weeks after initial dose")
+   - NEVER use "Per label" - always specify actual interval
+5. **Rationale**:
    - DOSE_REDUCTION: Cite all relevant papers from Clinical Evidence section
-     * Example (when multiple papers available): "Multiple studies support adalimumab dose reduction in stable psoriasis. The CONDOR trial (Atalay et al.) demonstrated that extending dosing intervals to every 4 weeks was noninferior to usual care based on DLQI. The 2-year follow-up study confirmed that 41% of patients maintained low-dose therapy without persistent flares. Additional studies by Piaserico et al. and Hansel et al. showed successful down-titration with maintenance of clearance."
-     * Example (when fewer papers available): "The CONDOR trial (Atalay et al.) demonstrated that dose reduction of adalimumab by extending intervals was safe and effective in stable psoriasis patients."
-     * Cite ALL relevant papers, whether that's 1, 3, or 5+ papers
-     * Include specific findings, trial names, author names from the papers actually provided
-     * Build rationale based on what the evidence actually shows - never invent citations
-     * ACCURACY > CITATION COUNT - truthfulness is paramount
-   - SWITCHES (formulary or therapeutic): Provide clear clinical reasoning, NO RAG citations needed
-6. Monitoring plan
+   - SWITCHES: Clear clinical reasoning (cost savings, efficacy, formulary optimization)
+   - Parse additionalNotes for comorbidities to justify drug selection
+6. **Monitoring plan**: Specific follow-up plan (e.g., "Reassess DLQI at 3 and 6 months")
 
-Return ONLY a JSON object with this exact structure:
+⚠️ NEVER output placeholder text like "No options available" as a drug name.
+⚠️ NEVER recommend the current drug as a "switch" - it's excluded from formulary options.
+⚠️ NEVER recommend same drug twice.
+
+Return ONLY valid JSON with this exact structure:
 {
   "recommendations": [
     {
@@ -720,6 +974,19 @@ export async function generateLLMRecommendations(
   quadrant: string;
   recommendations: any[];
   formularyReference?: any[];
+  contraindicatedDrugs?: Array<{
+    drugName: string;
+    drugClass: string;
+    tier: number;
+    requiresPA: string | null;
+    annualCost: number | null;
+    reasons: Array<{
+      type: string;
+      severity: 'ABSOLUTE' | 'RELATIVE';
+      reason: string;
+      details?: string;
+    }>;
+  }>;
 }> {
   // Fetch patient data
   const patient = await prisma.patient.findUnique({
@@ -836,6 +1103,21 @@ export async function generateLLMRecommendations(
   console.log(`Found current drug in formulary:`, currentFormularyDrug ? `YES - ${currentFormularyDrug.drugName} Tier ${currentFormularyDrug.tier}` : 'NO');
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 
+  // Detect current dose reduction level (0%, 25%, or 50%)
+  const currentDoseReduction = currentBiologic
+    ? getDoseReductionLevel(currentBiologic.drugName, currentBiologic.frequency)
+    : 0;
+  console.log(`Current dose reduction level: ${currentDoseReduction}%`);
+
+  // Find lowest tier available in formulary (relative tier detection)
+  const indicatedDrugs = formularyDrugs.filter(drug =>
+    filterByDiagnosis([drug], assessment.diagnosis).length > 0
+  );
+  const availableTiers = [...new Set(indicatedDrugs.map(d => d.tier))].sort((a, b) => a - b);
+  const lowestTierInFormulary = availableTiers[0] || 999;
+  const currentTier = currentFormularyDrug?.tier || 999;
+  console.log(`Formulary tier structure: Available tiers = [${availableTiers.join(', ')}], Lowest = ${lowestTierInFormulary}, Current = ${currentTier}`);
+
   // Step 1: Determine quadrant using hard-coded rules (don't trust LLM for this)
   const { isStable, isFormularyOptimal, quadrant} = determineQuadrantAndStatus(
     assessment.dlqiScore,
@@ -858,7 +1140,16 @@ export async function generateLLMRecommendations(
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
   // Step 2: Get LLM clinical reasoning
-  const triage = await triagePatient(assessment, genericDrugName || 'None', currentFormularyDrug || null, quadrant);
+  const triage = await triagePatient(
+    assessment,
+    genericDrugName || 'None',
+    currentFormularyDrug || null,
+    quadrant,
+    currentDoseReduction,
+    lowestTierInFormulary,
+    currentTier,
+    availableTiers
+  );
   console.log('Triage result:', JSON.stringify(triage));
 
   // Step 3: Retrieve structured clinical findings from database
@@ -868,8 +1159,11 @@ export async function generateLLMRecommendations(
 
   // Step 4: Filter drugs by diagnosis, then by contraindications
   const diagnosisAppropriateDrugs = filterByDiagnosis(patientWithFormulary.plan.formularyDrugs, assessment.diagnosis);
-  const safeFormularyDrugs = filterContraindicated(diagnosisAppropriateDrugs, patient.contraindications);
-  console.log(`Filtered formulary: ${patientWithFormulary.plan.formularyDrugs.length} total → ${diagnosisAppropriateDrugs.length} for ${assessment.diagnosis} → ${safeFormularyDrugs.length} safe`);
+  const { safe: safeFormularyDrugs, contraindicated: contraindicatedDrugs } = checkDrugContraindications(
+    diagnosisAppropriateDrugs,
+    patient.contraindications
+  );
+  console.log(`Filtered formulary: ${patientWithFormulary.plan.formularyDrugs.length} total → ${diagnosisAppropriateDrugs.length} for ${assessment.diagnosis} → ${safeFormularyDrugs.length} safe, ${contraindicatedDrugs.length} contraindicated`);
 
   // Sort safe formulary drugs to prioritize lower tiers
   const sortedFormularyDrugs = [...safeFormularyDrugs].sort((a, b) => {
@@ -892,7 +1186,11 @@ export async function generateLLMRecommendations(
     evidence,
     sortedFormularyDrugs,
     currentFormularyDrug || null,
-    patient.contraindications
+    patient.contraindications,
+    currentDoseReduction,
+    lowestTierInFormulary,
+    currentTier,
+    availableTiers
   );
 
   // Deduplicate and validate recommendations
@@ -995,12 +1293,23 @@ export async function generateLLMRecommendations(
     annualCost: drug.annualCostWAC?.toNumber(),
   }));
 
+  // Format contraindicated drugs for UI
+  const contraindicatedDrugsFormatted = contraindicatedDrugs.map(ci => ({
+    drugName: ci.drug.drugName,
+    drugClass: ci.drug.drugClass,
+    tier: ci.drug.tier,
+    requiresPA: ci.drug.requiresPA,
+    annualCost: ci.drug.annualCostWAC?.toNumber() || null,
+    reasons: ci.reasons,
+  }));
+
   return {
     isStable,
     isFormularyOptimal,
     quadrant,
     recommendations: recommendations.slice(0, 3),
     formularyReference,
+    contraindicatedDrugs: contraindicatedDrugsFormatted,
   };
 }
 
