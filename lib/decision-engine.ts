@@ -1,5 +1,4 @@
 import { prisma } from './db';
-import { searchKnowledge } from './rag/embeddings';
 import {
   Patient,
   CurrentBiologic,
@@ -320,11 +319,6 @@ export async function generateRecommendations(
     }
 
     // Add dose reduction as a future option
-    const doseReductionEvidence = await searchKnowledge(`${currentBiologic.drugName} dose reduction ${assessment.diagnosis}`, {
-      minSimilarity: 0.65,
-      maxResults: 5
-    });
-
     const doseSavings = calculateAssumedCosts(currentFormularyDrug?.tier, currentFormularyDrug?.tier, 25);
     recommendations.push({
       rank: 3,
@@ -334,7 +328,7 @@ export async function generateRecommendations(
       newFrequency: 'Extended interval (consider after sustained stability)',
       ...doseSavings,
       rationale: `Future consideration after ${monthsNeeded} more months of stability: Extended dosing intervals may maintain disease control while reducing costs once sustained stability (≥6 months) is confirmed.`,
-      evidenceSources: doseReductionEvidence.map(e => e.title),
+      evidenceSources: [],
       monitoringPlan: 'Consider this option once 6 months of sustained stability is achieved.',
       tier: currentFormularyDrug?.tier,
       requiresPA: currentFormularyDrug?.requiresPA,
@@ -402,12 +396,6 @@ export async function generateRecommendations(
     // Option 2: For Tier 2 ONLY, also offer dose reduction as alternative
     // Tier 3 is too expensive - must switch, cannot dose reduce
     if (currentTier === 2) {
-      // Retrieve dose reduction evidence for Tier 2
-      const doseReductionEvidence = await searchKnowledge(`${currentBiologic.drugName} dose reduction ${assessment.diagnosis}`, {
-        minSimilarity: 0.65,
-        maxResults: 10
-      });
-
       const doseSavings = calculateAssumedCosts(currentFormularyDrug?.tier, currentFormularyDrug?.tier, 25);
       recommendations.push({
         rank: recommendations.length + 1,
@@ -417,7 +405,7 @@ export async function generateRecommendations(
         newFrequency: 'Extended interval (discuss with provider)',
         ...doseSavings,
         rationale: `Alternative to switching: Patient stable (DLQI ${assessment.dlqiScore}) for ${assessment.monthsStable} months. Extended dosing may maintain control while reducing costs, though formulary switch offers greater savings.`,
-        evidenceSources: doseReductionEvidence.map(e => e.title),
+        evidenceSources: [],
         monitoringPlan: 'Close monitoring required. Assess DLQI monthly for first 3 months. Be prepared to resume standard dosing if disease activity increases.',
         tier: currentFormularyDrug?.tier,
         requiresPA: currentFormularyDrug?.requiresPA,

@@ -69,6 +69,17 @@ function convertRequiresPAToBoolean(requiresPA: string | null | undefined): bool
 }
 
 /**
+ * Strip markdown code blocks from LLM response
+ * Handles responses like ```json\n{...}\n```
+ */
+function stripMarkdownCodeBlock(text: string): string {
+  // Remove markdown code blocks (```json ... ``` or ``` ... ```)
+  const codeBlockRegex = /^```(?:json)?\s*\n?([\s\S]*?)\n?```$/;
+  const match = text.trim().match(codeBlockRegex);
+  return match ? match[1].trim() : text.trim();
+}
+
+/**
  * Determine formulary status and quadrant using hard-coded rules
  */
 function determineQuadrantAndStatus(
@@ -186,7 +197,9 @@ Return ONLY a JSON object with this exact structure:
   });
 
   const content = response.content[0];
-  const result = JSON.parse(content.type === 'text' ? content.text : '{}');
+  const rawText = content.type === 'text' ? content.text : '{}';
+  const cleanJson = stripMarkdownCodeBlock(rawText);
+  const result = JSON.parse(cleanJson);
   return result as TriageResult;
 }
 
@@ -637,9 +650,10 @@ Return ONLY a JSON object with this exact structure:
     });
 
     const responseContent = response.content[0];
-    const content = responseContent.type === 'text' ? responseContent.text : '{}';
-    console.log('LLM Response:', content); // Debug logging
-    const parsed = JSON.parse(content);
+    const rawContent = responseContent.type === 'text' ? responseContent.text : '{}';
+    console.log('LLM Response:', rawContent); // Debug logging
+    const cleanJson = stripMarkdownCodeBlock(rawContent);
+    const parsed = JSON.parse(cleanJson);
 
     // Handle both array and object responses
     const recommendations = Array.isArray(parsed) ? parsed : (parsed.recommendations || []);
