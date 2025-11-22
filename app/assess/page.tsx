@@ -167,6 +167,23 @@ export default function AssessmentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate dosing info is provided when on biologic
+    if (!formData.notOnBiologic) {
+      if (!formData.currentBiologic) {
+        alert('Please select a biologic medication.');
+        return;
+      }
+      if (!formData.dose) {
+        alert('Please select a dose for the biologic.');
+        return;
+      }
+      if (!formData.frequency) {
+        alert('Please select a dosing frequency.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {

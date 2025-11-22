@@ -190,7 +190,7 @@ export default function BiologicInput({
       {/* Dose Selection */}
       <div>
         <label className="label">
-          Dose
+          Dose {required && '*'}
           {isDoseDisabled && <span className="ml-1 text-xs text-gray-400">(select biologic first)</span>}
         </label>
         <select
@@ -198,10 +198,11 @@ export default function BiologicInput({
           value={value.dose}
           onChange={(e) => handleDoseChange(e.target.value)}
           disabled={isDoseDisabled}
+          required={required && !isDoseDisabled}
           style={isDoseDisabled ? { pointerEvents: 'none' } : {}}
         >
           <option value="">
-            {isDoseDisabled ? '-- Disabled --' : 'Select dose'}
+            {isDoseDisabled ? '-- Disabled --' : 'Select dose *'}
           </option>
           {approvedDoses.map((dose) => (
             <option key={dose} value={dose}>
@@ -224,7 +225,7 @@ export default function BiologicInput({
       {/* Frequency Selection */}
       <div>
         <label className="label">
-          Frequency
+          Frequency {required && '*'}
           {isFrequencyDisabled && <span className="ml-1 text-xs text-gray-400">(select biologic first)</span>}
         </label>
         {!customFrequency ? (
@@ -240,10 +241,11 @@ export default function BiologicInput({
                 }
               }}
               disabled={isFrequencyDisabled}
+              required={required && !isFrequencyDisabled}
               style={isFrequencyDisabled ? { pointerEvents: 'none' } : {}}
             >
               <option value="">
-                {isFrequencyDisabled ? '-- Disabled --' : 'Select frequency'}
+                {isFrequencyDisabled ? '-- Disabled --' : 'Select frequency *'}
               </option>
               {standardFrequencies.map((freq) => (
                 <option key={freq.value} value={freq.label}>
